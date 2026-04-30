@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="run test" type="js.build_tools.npm" singleton="false">
+    <package-json value="$PROJECT_DIR$/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="example" />
+    </scripts>
+    <arguments value="$FileName$" />
+    <node-interpreter value="project" />
+    <envs>
+      <env name="PLAYWRIGHT_HTML_OPEN" value="never" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

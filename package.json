@@ -1,0 +1,27 @@
+{
+  "name": "playwright-runner",
+  "version": "1.0.0",
+  "description": "Playwright helper tools",
+  "license": "ISC",
+  "author": "Denis Shelest <axules@mail.ru>",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "example": "npx playwright test",
+    "report": "npx playwright show-report"
+  },
+  "devDependencies": {
+    "@babel/cli": "7.28.6",
+    "@babel/core": "7.29.0",
+    "@babel/preset-env": "7.29.2",
+    "@playwright/test": "1.59.1",
+    "cross-env": "10.1.0",
+    "eslint": "10.2.0",
+    "jest": "30.3.0",
+    "jpeg-js": "0.4.4",
+    "pixelmatch": "7.1.0",
+    "playwright": "1.59.1",
+    "lodash.isstring": "4.0.1"
+  }
+}
