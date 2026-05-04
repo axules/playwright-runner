@@ -6,7 +6,7 @@ describe('resolveQuery', () => {
     ['div |> :button"Submit"', [['locator', 'div'], ['getByRole', 'button', { name: 'Submit'}]]],
   ];
 
-  test.each(testCases)('', (value, expected) => {
+  test.each(testCases)('%#. %s', (value, expected) => {
     const result = resolveQuery(value);
     expect(result).toEqual(expected);
   })
@@ -30,6 +30,7 @@ describe('resolveText', () => {
 describe('resolveQueryPiece', () => {
   const testCases = [
     [':"Button title"', ['getByText', 'Button title']],
+    ['"Button title"', ['getByText', 'Button title']],
     [':"*Button title*"', ['getByText', /^.*Button title.*$/i]],
     [':~Field label', ['getByLabel', 'Field label']],
     [':~Field label*', ['getByLabel', /^Field label.*$/i]],

@@ -1,12 +1,19 @@
 import {test} from "@playwright/test";
 import {newRunner} from "../src/runner";
 
-test('Mobile and geolocation', async ({ page }) => {
-  await newRunner(page)
+test('Check login and registration forms', async ({ page }) => {
+  await newRunner(page, { debug: true })
     .goto('https://zapiski.online')
-    .containsText('Войти')
-    .pause()
-    .click('Регистрация')
-    .containsText('Повторите пароль')
+    .moveToChild('.cookiesNotification')
+    .seeText('Мы используем cookies для работы сервиса. Продолжая пользоваться сервисом ЗапискиОнлайн, вы принимаете')
+    .click('button')
+    .dontSee()
+    .reloadPage()
+    .dontSee()
+    .moveTo('#login_frame')
+    .seeText('Войти')
+    .click('"Регистрация"')
+    .seeText('Повторите пароль')
+    .fullWay()
     .run();
 });

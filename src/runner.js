@@ -1,16 +1,16 @@
 import fs from 'fs';
-import {expect, test} from "@playwright/test";
+import { expect } from "@playwright/test";
 import {
   selectElement,
   selectElements,
   getPage,
   getStyles,
-  isVisible,
   getAttributes,
   promiseFlow,
   resolveUrlSearchParams,
   matchString,
-  matchObject, isPage
+  matchObject,
+  isPage
 } from './tools/utils';
 import ShotMatchError from './tools/ShotMatchError';
 import MatcherError from './tools/MatcherError';
@@ -18,6 +18,7 @@ import { toRedText, toGreenText } from './tools/makeExpectedError';
 import PageNetworkListener from './tools/PageNetworkListener';
 import { diffImages } from './tools/diffImages';
 import {resolveLocator} from "./tools/resolveLocator";
+import {Locator} from "playwright-core";
 
 
 export function newRunner(pageOrLocator, config = {}) {
@@ -33,20 +34,7 @@ export function newRunner(pageOrLocator, config = {}) {
   );
 }
 
-function createMatcher(action, initError) {
-  return async function throwingMatcher(...args) {
-    // if (typeof global.expect !== 'undefined') {
-    //   global.expect.getState().assertionCalls += 1;
-    // }
-    try {
-      return await action(...args);
-    } catch (error) {
-      error.stack = initError.stack;
-      error.message = `\n${initError.message}\n${error.message}\n`;
-      throw error;
-    }
-  };
-}
+
 
 function expectToBeDefined(name, received) {
   if (typeof received === 'undefined') {
@@ -108,28 +96,49 @@ export class AsyncRunner {
     this.updateShot = updateShot;
     this.screenshoter = screenshoter;
     this.pull = [];
-    this.log = debug ? console.log : () => null;
     this.debug = debug || false;
+    this.log = this.debug
+      ? (...args) => console.log(new Date().toISOString().replace('T', ' ').slice(10, 23), ...args)
+      : () => null;
 
     this._disabled.not = (selector) => this._disabled(selector, true);
     this._checked.not = (selector) => this._checked(selector, true);
     this._has.not = (selectors) => this._has(selectors, true);
+
+    this.log('New runner created', initialLocator, options);
   }
 
-  _setContainer(node) {
+  _createMatcher(caller, action, initError) {
+    return async (...args) => {
+      // if (typeof global.expect !== 'undefined') {
+      //   global.expect.getState().assertionCalls += 1;
+      // }
+      try {
+        this.log('Action:', caller.name, 'with args', args);
+        return await action(...args);
+      } catch (error) {
+        this.log('Action:', caller.name, 'failed', error);
+        error.stack = initError.stack;
+        error.message = `\nCurrent locator: ${this.currentLocator}\nMethod: ${initError.message}\nMessage: ${error.message}\n`;
+        throw error;
+      } finally {
+        this.log('Action:', caller.name, 'finished')
+      }
+    };
   }
 
-  async _changeContainer(page, selector) {
-    const nodeSelector = typeof selector === 'string' ? selector : 'body';
-    const newContainer = await selectElement(page, nodeSelector);
-    this._setContainer(newContainer || page);
-  }
-
+  /**
+   *
+   * @param caller
+   * @param nextAction
+   * @returns {AsyncRunner}
+   * @private
+   */
   _then(caller, nextAction) {
     if (!caller) throw new Error('Caller is undefined!');
     const initError = new Error(caller.name);
     Error.captureStackTrace(initError, caller);
-    const nextMatcher = createMatcher(nextAction, initError);
+    const nextMatcher = this._createMatcher(caller, nextAction, initError);
     if (this.pull.length > 0) {
       const last = this.pull[this.pull.length - 1];
       // this.pull.push(last.then(() => Promise.resolve(nextAction())));
@@ -138,22 +147,23 @@ export class AsyncRunner {
       this.pull.push(Promise.resolve(nextMatcher()));
     }
 
-    if (this.debug) {
-      const last = this.pull[this.pull.length - 1];
-      last.then(() => this.log(`${caller.name} is finished`));
-      last.catch((error) => {
-        console.error(caller.name);
-        return Promise.reject(error);
-      });
-    }
-
     return this;
   }
 
+  /**
+   * Use to get current Playwright Locator
+   *
+   * @returns {Locator}
+   */
   get currentLocator() {
     return this.locatorsWay[this.locatorsWay.length - 1];
   }
 
+  /**
+   * Use to get current Playwright Page
+   *
+   * @returns {playwright.Page}
+   */
   get currentPage() {
     return this.page;
   }
@@ -162,8 +172,14 @@ export class AsyncRunner {
     return new URL(this.currentPage.url());
   }
 
-  find(locatorOrSelector) {
-    return resolveLocator(this.currentLocator, locatorOrSelector);
+  /**
+   * Find children locator or current if selector is empty
+   *
+   * @arg {Locator|String?} locatorOrSelector
+   * @returns {Locator}
+   */
+  find(locatorOrSelector = undefined) {
+    return locatorOrSelector ? resolveLocator(this.currentLocator, locatorOrSelector) : this.currentLocator;
   }
 
   _waitForNavigation(options) {
@@ -266,53 +282,17 @@ export class AsyncRunner {
 
   async run() {
     if (this.pull.length > 0) {
-      await this.pull[this.pull.length - 1].then(
-        () => this.log('Pull is finished'),
-        // (error) => console.error('Pull is failed', error),
-      );
+      await this.pull[this.pull.length - 1];
+      this.log('Pull is finished');
     }
     return this;
   }
 
   pause() {
-    return this._then(this.hasNo, async () => {
+    return this._then(this.pause, async () => {
       await this.currentPage.pause();
     });
   }
-
-  hasNo(selectors) {
-    return this._then(this.hasNo, async () => {
-      await this._has.not(selectors);
-    });
-  }
-
-  has(selectors) {
-    return this._then(this.has, async () => {
-      await this._has(selectors);
-    });
-  }
-
-  // appear(selector, timeout = 5000) {
-  //   return this._then(this.appear, async () => {
-  //     await this._waitTarget(selector, { timeout });
-  //   });
-  // }
-  //
-  // disappear(selector, timeout = 5000) {
-  //   if (!selector) return this;
-  //   return this._then(this.disappear, async () => {
-  //     await this._waitPromise(
-  //       async () => !(await this._getTarget(selector)),
-  //       { timeout }
-  //     );
-  //   });
-  // }
-
-  // toWait(selector, options = {}) {
-  //   return this._then(this.toWait, async () => {
-  //     await this._waitTarget(selector, { timeout: 30000, ...options });
-  //   });
-  // }
 
   waitTime(timeout = 5000) {
     return this._then(this.waitTime, async () => {
@@ -320,8 +300,8 @@ export class AsyncRunner {
     });
   }
 
-  waitNavigation(selector = undefined, timeout = 15000) {
-    this._then(this.waitNavigation, async () => {
+  waitForNavigation(selector = undefined, timeout = 15000) {
+    this._then(this.waitForNavigation, async () => {
       await this._waitForNavigation();
       if (selector) {
         await this._waitTarget(selector, { timeout });
@@ -330,10 +310,10 @@ export class AsyncRunner {
     return this;
   }
 
-  waitRequest(options = {}) {
+  waitForRequest(options = {}) {
     const { minCount = 0, ...restOptions } = options;
 
-    this._then(this.waitRequest, async () => {
+    this._then(this.waitForRequest, async () => {
       await this._waitPromise(
         async () => {
           const page = this.currentPage;
@@ -359,6 +339,12 @@ export class AsyncRunner {
     });
   }
 
+  moveTo(selector) {
+    return this._then(this.moveTo, async () => {
+      this.locatorsWay.push(this.currentPage.locator(selector));
+    });
+  }
+
   moveToBody() {
     return this._then(this.moveToBody, async () => {
       this.locatorsWay.push(this.currentPage.locator('body'));
@@ -367,6 +353,7 @@ export class AsyncRunner {
 
   moveToChild(selector) {
     return this._then(this.moveToChild, async () => {
+      this.log(this.currentLocator, '->', selector);
       this.locatorsWay.push(this.currentLocator.locator(selector));
     });
   }
@@ -379,23 +366,25 @@ export class AsyncRunner {
 
   where() {
     return this._then(this.where, async () => {
-      console.log(this.currentLocator);
+      console.log('I am here: ', this.currentLocator);
     });
   }
 
-  visible(selector = null) {
-    return this._then(this.visible, async () => {
-      const target = await this._waitTarget(selector);
-      expectToBe('', await isVisible(target), true);
-      // await target.dispose();
+  fullWay() {
+    return this._then(this.fullWay, async () => {
+      console.log('I was here: ', this.locatorsWay.join(' -->> '));
     });
   }
 
-  hidden(selector = null) {
-    return this._then(this.hidden, async () => {
-      const target = await this._waitTarget(selector);
-      expectToBe(await isVisible(target), false);
-      // await target.dispose();
+  see(selector = null) {
+    return this._then(this.see, async () => {
+      await expect(this.find(selector)).toBeVisible();
+    });
+  }
+
+  dontSee(selector = undefined) {
+    return this._then(this.dontSee, async () => {
+      await expect(this.find(selector)).toBeHidden();
     });
   }
 
@@ -464,7 +453,7 @@ export class AsyncRunner {
 
   click(selector = undefined, options = undefined) {
     return this._then(this.click, async () => {
-      const locator = selector ? this.find(selector) : this.currentLocator;
+      const locator = this.find(selector);
       await expect(locator).toBeEnabled();
       await locator.click(options);
     });
@@ -472,7 +461,7 @@ export class AsyncRunner {
 
   fill(selector, text, options = undefined) {
     return this._then(this.fill, async () => {
-      const locator = selector ? this.find(selector) : this.currentLocator;
+      const locator = this.find(selector);
       await expect(locator).toBeEnabled();
       await locator.fill(text, options);
     });
@@ -514,15 +503,15 @@ export class AsyncRunner {
     });
   }
 
-  containsText(text) {
-    return this._then(this.containsText, async () => {
-      await test.expect(this.currentLocator).toContainText(text);
+  seeText(text) {
+    return this._then(this.seeText, async () => {
+      await expect(this.currentLocator).toContainText(text);
     });
   }
 
-  hasText(text) {
-    return this._then(this.hasText, async () => {
-      await test.expect(this.currentLocator).toHaveText(text);
+  seeExactText(text) {
+    return this._then(this.seeExactText, async () => {
+      await expect(this.currentLocator).toHaveText(text);
     });
   }
 
@@ -577,6 +566,12 @@ export class AsyncRunner {
     });
   }
 
+  say(text) {
+    return this._then(this.say, async () => {
+      console.log(text);
+    });
+  }
+
   goto(url, waitForSelector = undefined, timeout = undefined) {
     return this._then(this.goto, async () => {
       const { currentPage } = this;
@@ -590,64 +585,47 @@ export class AsyncRunner {
 
   reloadPage(waitForLocator = null, timeout = 5000) {
     return this._then(this.reloadPage, async () => {
-      const page = this.currentPage;
-      await page.reload({ timeout, waitUntil: ['load', 'networkidle0'] });
+      const { currentPage } = this;
+      await currentPage.reload({ timeout, waitUntil: 'networkidle0' });
       if (waitForLocator) {
-        await this._wait(waitForLocator, { timeout });
+        await expect(currentPage.locator(waitForSelector)).toBeVisible();
       }
     });
   }
 
-  clear(selector) {
+  clear(selector = undefined) {
     return this._then(this.clear, async () => {
-      const target = await this._waitTarget(selector);
-      await this._disabled.not(target);
-
-      await target.click({ clickCount: 3 });
-      await target.press('Backspace');
-      // await target.dispose();
+      await this.find(selector).clear();
     });
   }
 
   select(selector, values) {
     return this._then(this.select, async () => {
-      const target = await this._waitTarget(selector);
-      await this._disabled.not(target);
-      await target.select(...(Array.isArray(values) ? values : [values]));
-      // await target.dispose();
+      await this.find(selector).selectOption(values);
     });
   }
 
-  focus(selector) {
+  focus(selector = undefined) {
     return this._then(this.focus, async () => {
-      const target = await this._waitTarget(selector);
-      await this._disabled.not(target);
-      await target.focus();
-      // await target.dispose();
+      await this.find(selector).focus();
     });
   }
 
-  blur() {
+  blur(selector = undefined) {
     return this._then(this.blur, async () => {
-      await this.currentPage.evaluate(() => window.document.activeElement.blur());
+      await this.find(selector).blur();
     });
   }
 
-  hover(selector) {
+  hover(selector = undefined) {
     return this._then(this.hover, async () => {
-      const target = await this._waitTarget(selector);
-      await this._disabled.not(target);
-      await target.hover();
-      // await target.dispose();
+      await this.find(selector).hover();
     });
   }
 
   uploadFile(selector, files) {
     return this._then(this.uploadFile, async () => {
-      const target = await this._waitTarget(selector);
-      await this._disabled.not(target);
-      await target.uploadFile(...(Array.isArray(files) ? files : [files]));
-      // await target.dispose();
+      await this.find(selector).setInputFiles(Array.isArray(files) ? files : [files]);
     });
   }
 

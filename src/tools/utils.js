@@ -81,7 +81,7 @@ export async function isVisible(elements) {
       if (!el) return false;
       const style = await getStyleInContent(page, el, 'visibility,opacity');
       return (
-        style.visibility !== 'hidden' &&
+        style.visibility !== 'dontSee' &&
         parseFloat(style.opacity || 1) > 0 &&
         (await isVisibleBox(el))
       );
