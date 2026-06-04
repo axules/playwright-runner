@@ -88,6 +88,7 @@ export class AsyncRunner {
       targetTimeout = 2500,
     } = options;
 
+    this.runCallerCounter = 0;
     this.locatorsWay = [initialLocator];
     this.page = getPage(initialLocator);
     initNetworkListener(this.page);
@@ -110,19 +111,27 @@ export class AsyncRunner {
 
   _createMatcher(caller, action, initError) {
     return async (...args) => {
+      const counter = `          ${this.runCallerCounter++}`.slice(-10);
       // if (typeof global.expect !== 'undefined') {
       //   global.expect.getState().assertionCalls += 1;
       // }
       try {
-        this.log('Action:', caller.name, 'with args', args);
+        this.log(`Action ${counter}:`, caller.name, 'with args', args);
         return await action(...args);
       } catch (error) {
-        this.log('Action:', caller.name, 'failed', error);
+        this.log(`Action ${counter}:`, caller.name, 'failed');
         error.stack = initError.stack;
-        error.message = `\nCurrent locator: ${this.currentLocator}\nMethod: ${initError.message}\nMessage: ${error.message}\n`;
+        error.message = [
+          '',
+          `Method: ${initError.message}`,
+          `Current locator: ${this.currentLocator}`,
+          'Message:',
+          error.message,
+          error.stack,
+        ].join('\n');
         throw error;
       } finally {
-        this.log('Action:', caller.name, 'finished')
+        this.log(`Action ${counter}:`, caller.name, 'finished')
       }
     };
   }

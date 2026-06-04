@@ -18,6 +18,7 @@ export default defineConfig({
   preserveOutput: 'failures-only',
   testDir: './examples',
   testMatch: '*.uitest.js',
+  repeatEach: 1,
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
