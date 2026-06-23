@@ -23,7 +23,7 @@
     "eslint-plugin-import": "2.32.0",
     "eslint-plugin-import-newlines": "2.0.0",
     "eslint-plugin-simple-import-sort": "13.0.0",
-    "eslint-presets": "github:axules/eslint-presets#v1.0.2",
+    "eslint-presets": "github:axules/eslint-presets#v1.0.7",
     "jest": "30.3.0",
     "jpeg-js": "0.4.4",
     "pixelmatch": "7.1.0",

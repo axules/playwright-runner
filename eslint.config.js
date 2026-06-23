@@ -1,10 +1,7 @@
 import babelParser from '@babel/eslint-parser';
 // eslint-disable-next-line import/no-unresolved
 import { defineConfig } from 'eslint/config';
-import {
-  jsConfig,
-  reactConfig,
-} from 'eslint-presets';
+import { jsConfig } from 'eslint-presets';
 import globals from 'globals';
 
 
@@ -24,17 +21,13 @@ const customConfig = {
     },
     globals: {
       ...globals.jest,
-      ...globals.serviceworker,
-      ...globals.browser,
       ...globals.node,
-      ...globals.commonjs,
     },
   },
   settings: {
-    react: { version: '19' },
     'import/resolver': {
       node: {
-        extensions: ['.js', '.jsx'],
+        extensions: ['.js'],
       },
     },
   },
@@ -46,10 +39,4 @@ const customConfig = {
 export default defineConfig([
   customConfig,
   jsConfig,
-  reactConfig,
-  {
-    rules: {
-      eqeqeq: 0,
-    },
-  },
 ]);
