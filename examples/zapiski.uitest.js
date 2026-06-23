@@ -1,5 +1,7 @@
-import {test} from "@playwright/test";
-import {newRunner} from "../src/runner";
+import { test } from '@playwright/test';
+
+import { newRunner } from '../src/runner';
+
 
 test('Check login and registration forms', async ({ page }) => {
   await newRunner(page, { debug: true })

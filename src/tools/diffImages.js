@@ -1,18 +1,29 @@
 import fs from 'fs';
-import { PNG } from 'pngjs';
 import jpegJs from 'jpeg-js';
 import pixelmatch from 'pixelmatch';
+import { PNG } from 'pngjs';
+
 
 function isString(a) {
   return typeof a === 'string';
 }
 
 function getExt(fn) {
-  return (fn.split('.').pop()).toLowerCase();
+  return (fn.split('.').pop())
+    .toLowerCase();
 }
 
 function isPng(fn) {
   return isString(fn) && getExt(fn) === 'png';
+}
+
+function readBuffer(file, defaultPng) {
+  if (isString(file)) {
+    const buffer = fs.readFileSync(file);
+    return isPng(file) ? PNG.sync.read(buffer) : jpegJs.decode(buffer);
+  } else {
+    return defaultPng ? PNG.sync.read(file) : jpegJs.decode(file);
+  }
 }
 
 export function diffImages(expected, actual, threshold = 0.05) {
@@ -28,7 +39,7 @@ export function diffImages(expected, actual, threshold = 0.05) {
     diff.data,
     expectedBuffer.width,
     expectedBuffer.height,
-    { threshold }
+    { threshold },
   );
   diff.save = (fn) => fs.writeFileSync(fn, PNG.sync.write(diff));
   return {
@@ -37,13 +48,4 @@ export function diffImages(expected, actual, threshold = 0.05) {
     width: expectedBuffer.width,
     height: expectedBuffer.height,
   };
-}
-
-function readBuffer(file, defaultPng) {
-  if (isString(file)) {
-    const buffer = fs.readFileSync(file);
-    return isPng(file) ? PNG.sync.read(buffer) : jpegJs.decode(buffer);
-  } else {
-    return defaultPng ? PNG.sync.read(file) : jpegJs.decode(file);
-  }
 }

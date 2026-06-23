@@ -1,5 +1,6 @@
-import path from 'path';
 import fs from 'fs';
+import path from 'path';
+
 import { takeScreenshot } from './takeScreenshot';
 
 
@@ -12,13 +13,13 @@ export async function addScreenshotReporter() {
   // };
 
   jasmine.getEnv().addReporter({
-    jasmineStarted: function(info) {
+    jasmineStarted: function (info) {
       console.log('jasmineStarted', info);
     },
-    suiteStarted: function(info) {
+    suiteStarted: function (info) {
       console.log('suiteStarted', info);
     },
-    specDone: async function(result, z) {
+    specDone: async function (result, z) {
       console.log('specDone', result, z);
       // if (result.status !== 'passed' && suitIncludesSpec(testsSuit, result.id)) {
       //   console.log('-----------> Report save ---> ' + options.dirName);

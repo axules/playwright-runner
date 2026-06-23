@@ -1,6 +1,10 @@
 import path from 'path';
-import { isPage, getPage } from './utils';
+
 import { createDirDeep } from './createDirDeep';
+import {
+  getPage,
+  isPage,
+} from './utils';
 
 
 const SHOT_EXT = 'jpeg';
@@ -45,7 +49,7 @@ function removeUrlElement(target) {
   const page = getPage(target);
   return page.evaluate((labelId) => {
     try {
-       const versionLabel = window.document.querySelector(`#${labelId}`);
+      const versionLabel = window.document.querySelector(`#${labelId}`);
       if (versionLabel) {
         versionLabel.parentElement.removeChild(versionLabel);
       }
@@ -57,9 +61,9 @@ function removeUrlElement(target) {
 }
 
 export async function takeScreenshot(target, options = {}) {
-  const name = (typeof(options) == 'string' ? options : options.name)
+  const config = typeof (options) == 'string' ? {} : options;
+  const name = (typeof (options) == 'string' ? options : options.name)
     || config.prefix + String(Math.random()).slice(2, 8) + '_' + new Date().getTime();
-  const config = typeof(options) == 'string' ? {} : options;
   const { save = true, returnBuffer = false, printUrl = false } = config;
   let fullName = undefined;
   if (save) {
@@ -75,7 +79,7 @@ export async function takeScreenshot(target, options = {}) {
     type: SHOT_EXT,
     fullPage: isPage(target),
     quality: QUALITY,
-    ...config
+    ...config,
   });
 
   if (printUrl) {
@@ -84,12 +88,12 @@ export async function takeScreenshot(target, options = {}) {
   return save && !returnBuffer ? name : result;
 }
 
-export function screenshoter(dirOrSuit) {
+export function screenshotTool(dirOrSuit) {
   let n = 1;
-  const dir = typeof(dirOrSuit) == 'string' ? dirOrSuit : path.parse(dirOrSuit.result.testPath).dir;
+  const dir = typeof (dirOrSuit) == 'string' ? dirOrSuit : path.parse(dirOrSuit.result.testPath).dir;
 
   const shooter = (target, optionsOrName) => {
-    const isName = typeof(optionsOrName) == 'string';
+    const isName = typeof (optionsOrName) == 'string';
     const name = isName ? optionsOrName : optionsOrName?.name || n++;
     const options = isName ? { } : optionsOrName;
     return takeScreenshot(target, { dir, name, ...options });

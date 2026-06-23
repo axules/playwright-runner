@@ -14,16 +14,16 @@ export function resolveText(text) {
 
 export function resolveQueryPiece(locatorPiece) {
   if (locatorPiece.startsWith(':"')) {
-    const [, text] = locatorPiece.match(/:"([^\[\]].+)"/);
+    const [, text] = locatorPiece.match(/:"([^[\]].+)"/);
     return ['getByText', resolveText(text)];
   } else if (locatorPiece.startsWith('"')) {
-    const [, text] = locatorPiece.match(/"([^\[\]].+)"/);
+    const [, text] = locatorPiece.match(/"([^[\]].+)"/);
     return ['getByText', resolveText(text)];
   } else if (locatorPiece.startsWith(':~')) {
     return ['getByLabel', resolveText(locatorPiece.slice(2))];
   } else if (locatorPiece.startsWith(':')) {
-    const [, role, text] = locatorPiece.match(/:(.+)"([^\[\]].+)"/);
-    return ['getByRole', role, { name: resolveText(text) }]
+    const [, role, text] = locatorPiece.match(/:(.+)"([^[\]].+)"/);
+    return ['getByRole', role, { name: resolveText(text) }];
   }
   return ['locator', locatorPiece];
 }

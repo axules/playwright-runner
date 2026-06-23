@@ -1,3 +1,35 @@
+class ListenedRequest {
+  constructor(request) {
+    this._request = request;
+    this.started = new Date();
+    this.finished = null;
+  }
+
+  finish(request) {
+    if (this.is(request)) {
+      this.finished = new Date();
+      return true;
+    }
+    return false;
+  }
+
+  duration() {
+    return this.finished ? this.finished.getTime() - this.started.getTime() : 0;
+  }
+
+  response() {
+    return this.request.response();
+  }
+
+  request() {
+    return this._request;
+  }
+
+  is(request) {
+    return this._request === request;
+  }
+}
+
 export default class PageNetworkListener {
   constructor(page) {
     this.activeRequests = 0;
@@ -55,43 +87,14 @@ export default class PageNetworkListener {
         return !!matcher(el.request());
       }
       if (typeof matcher === 'string') {
-        return el.request().url().includes(matcher);
+        return el.request().url()
+          .includes(matcher);
       }
       if (matcher instanceof RegExp) {
-        return !!el.request().url().match(matcher);
+        return !!el.request().url()
+          .match(matcher);
       }
     });
   }
 }
 
-class ListenedRequest {
-  constructor(request) {
-    this._request = request;
-    this.started = new Date();
-    this.finished = null;
-  }
-
-  finish(request) {
-    if (this.is(request)) {
-      this.finished = new Date();
-      return true;
-    }
-    return false;
-  }
-
-  duration() {
-    return this.finished ? this.finished.getTime() - this.started.getTime() : 0;
-  }
-
-  response() {
-    return this.request.response();
-  }
-
-  request() {
-    return this._request;
-  }
-
-  is(request) {
-    return this._request === request;
-  }
-}

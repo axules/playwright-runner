@@ -24,13 +24,6 @@ export async function selectElements(container, selector) {
   );
 }
 
-export async function getStyles(node, styles) {
-  return getStyleInContent(await getPage(node), node, styles);
-}
-
-export async function getAttributes(node, attributes) {
-  return getAttributesInContent(node, attributes);
-}
 
 async function getStyleInContent(page, node, selectStyles) {
   const select = (Array.isArray(selectStyles) ? selectStyles : (selectStyles || '').split(','))
@@ -48,7 +41,7 @@ async function getStyleInContent(page, node, selectStyles) {
       }, {});
     },
     node,
-    select
+    select,
   );
 }
 
@@ -64,8 +57,42 @@ async function getAttributesInContent(node, selectAttr) {
         return R;
       }, {});
     },
-    select
+    select,
   );
+}
+
+export function getElementType(element) {
+  if (
+    element
+    && element.$
+    && element.constructor
+    && element.constructor.name
+    && ['Page', 'Frame', 'ElementHandle'].includes(element.constructor.name)
+  ) {
+    return element.constructor.name;
+  }
+
+  return null;
+}
+
+export function isPage(element) {
+  return element && getElementType(element) === 'Page';
+}
+
+export function getPage(element) {
+  if (!element) return null;
+  if (isPage(element)) return element;
+  return element._page || element?._frame?._page;
+  // const frame = await(await element.executionContext()).frame();
+  // return frame?._frameManager?._page || frame;
+}
+
+export async function getStyles(node, styles) {
+  return getStyleInContent(await getPage(node), node, styles);
+}
+
+export async function getAttributes(node, attributes) {
+  return getAttributesInContent(node, attributes);
 }
 
 export async function isVisible(elements) {
@@ -78,40 +105,14 @@ export async function isVisible(elements) {
   const elList = Array.isArray(elements) ? elements : [elements];
   const page = await getPage(elList.find(el => !!el));
   return !!page && elList.every(async el => {
-      if (!el) return false;
-      const style = await getStyleInContent(page, el, 'visibility,opacity');
-      return (
-        style.visibility !== 'dontSee' &&
-        parseFloat(style.opacity || 1) > 0 &&
-        (await isVisibleBox(el))
-      );
-    });
-}
-
-export function getPage(element) {
-  if (!element) return null;
-  if (isPage(element)) return element;
-  return element._page || element?._frame?._page;
-  // const frame = await(await element.executionContext()).frame();
-  // return frame?._frameManager?._page || frame;
-}
-
-export function isPage(element) {
-  return element && getElementType(element) === 'Page';
-}
-
-export function getElementType(element) {
-  if (
-    element &&
-    element.$ &&
-    element.constructor &&
-    element.constructor.name &&
-    ['Page', 'Frame', 'ElementHandle'].includes(element.constructor.name)
-  ) {
-    return element.constructor.name;
-  }
-
-  return null;
+    if (!el) return false;
+    const style = await getStyleInContent(page, el, 'visibility,opacity');
+    return (
+      style.visibility !== 'dontSee'
+      && parseFloat(style.opacity || 1) > 0
+      && (await isVisibleBox(el))
+    );
+  });
 }
 
 export function getYMD(date = new Date()) {
@@ -122,9 +123,9 @@ export function getYMD(date = new Date()) {
     date.getHours(),
     date.getMinutes(),
     date.getSeconds(),
-    date.getMilliseconds()
+    date.getMilliseconds(),
   ].map(el => (String(el).length >= 2 ? el : `00${el}`.slice(-2)))
-  .join('_');
+    .join('_');
 }
 
 export function clearPath(str) {
@@ -150,7 +151,7 @@ export function promiseFlow(list = []) {
 
 export function resolveUrlSearchParams(params) {
   const result = {};
-  params.forEach(([k,v]) => {
+  params.forEach(([k, v]) => {
     if (!result[k]) result[k] = [];
     result[k].push(v);
   });

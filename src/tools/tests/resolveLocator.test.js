@@ -1,15 +1,19 @@
-import {resolveQuery, resolveQueryPiece, resolveText} from "../resolveLocator";
+import {
+  resolveQuery,
+  resolveQueryPiece,
+  resolveText,
+} from '../resolveLocator';
 
 
 describe('resolveQuery', () => {
   const testCases = [
-    ['div |> :button"Submit"', [['locator', 'div'], ['getByRole', 'button', { name: 'Submit'}]]],
+    ['div |> :button"Submit"', [['locator', 'div'], ['getByRole', 'button', { name: 'Submit' }]]],
   ];
 
   test.each(testCases)('%#. %s', (value, expected) => {
     const result = resolveQuery(value);
     expect(result).toEqual(expected);
-  })
+  });
 });
 
 describe('resolveText', () => {
@@ -35,7 +39,7 @@ describe('resolveQueryPiece', () => {
     [':~Field label', ['getByLabel', 'Field label']],
     [':~Field label*', ['getByLabel', /^Field label.*$/i]],
     [':button"*Button title*"', ['getByRole', 'button', { name: /^.*Button title.*$/i }]],
-    ['button:at(2)', ['locator', 'button:at(2)']]
+    ['button:at(2)', ['locator', 'button:at(2)']],
   ];
 
   test.each(testCases)('%#. %s', (value, expected) => {

@@ -1,4 +1,8 @@
-import { test, devices } from '@playwright/test';
+import {
+  devices,
+  test,
+} from '@playwright/test';
+
 
 test.use({
   ...devices['iPhone 13 Pro'],

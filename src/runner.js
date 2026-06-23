@@ -1,39 +1,28 @@
+import { expect } from '@playwright/test';
 import fs from 'fs';
-import { expect } from "@playwright/test";
+import { Locator } from 'playwright-core';
+
+import { diffImages } from './tools/diffImages';
 import {
-  selectElement,
-  selectElements,
+  toGreenText,
+  toRedText,
+} from './tools/makeExpectedError';
+import MatcherError from './tools/MatcherError';
+import PageNetworkListener from './tools/PageNetworkListener';
+import { resolveLocator } from './tools/resolveLocator';
+import ShotMatchError from './tools/ShotMatchError';
+import {
+  getAttributes,
   getPage,
   getStyles,
-  getAttributes,
+  isPage,
+  matchObject,
+  matchString,
   promiseFlow,
   resolveUrlSearchParams,
-  matchString,
-  matchObject,
-  isPage
+  selectElement,
+  selectElements,
 } from './tools/utils';
-import ShotMatchError from './tools/ShotMatchError';
-import MatcherError from './tools/MatcherError';
-import { toRedText, toGreenText } from './tools/makeExpectedError';
-import PageNetworkListener from './tools/PageNetworkListener';
-import { diffImages } from './tools/diffImages';
-import {resolveLocator} from "./tools/resolveLocator";
-import {Locator} from "playwright-core";
-
-
-export function newRunner(pageOrLocator, config = {}) {
-  if (!pageOrLocator) {
-    throw new Error('Initial locator should be defined');
-  }
-  return new AsyncRunner(
-    isPage(pageOrLocator) ? pageOrLocator.locator('body') : pageOrLocator,
-    {
-      updateShot: process.env.NODE_MODE == 'update',
-      ...config
-    }
-  );
-}
-
 
 
 function expectToBeDefined(name, received) {
@@ -55,7 +44,7 @@ function expectNetworkListener(page) {
     throw new MatcherError(
       `${toRedText(page.networkListener)} is undefined.\nUse ${toGreenText('page.networkListener = new PageNetworkListener(page)')} after open this page`,
       'undefined',
-      'PageNetworkListener object'
+      'PageNetworkListener object',
     );
   }
   return true;
@@ -67,7 +56,7 @@ function expectNetworkListenerIsActive(page) {
     throw new MatcherError(
       `networkListener is not active.\nUse ${toGreenText('toListenNetwork()')} before action that should send request to activate listening.\n And ${toGreenText('toStopListenNetwork()')} after checking`,
       'page.networkListener.active=false',
-      'page.networkListener.active=true'
+      'page.networkListener.active=true',
     );
   }
   return true;
@@ -79,12 +68,16 @@ function initNetworkListener(page) {
   }
 }
 
+function defaultScreenshotMaster() {
+  throw new Error('You should put "screenshot tool" as additional option');
+}
+
 export class AsyncRunner {
   constructor(initialLocator, options = {}) {
     const {
       debug = false,
       updateShot = false,
-      screenshoter = defaultScreenshoter,
+      screenshotTool = defaultScreenshotMaster,
       targetTimeout = 2500,
     } = options;
 
@@ -95,11 +88,13 @@ export class AsyncRunner {
 
     this.targetTimeout = targetTimeout;
     this.updateShot = updateShot;
-    this.screenshoter = screenshoter;
+    this.screenshotTool = screenshotTool;
     this.pull = [];
     this.debug = debug || false;
     this.log = this.debug
-      ? (...args) => console.log(new Date().toISOString().replace('T', ' ').slice(10, 23), ...args)
+      ? (...args) => console.log(new Date().toISOString()
+        .replace('T', ' ')
+        .slice(10, 23), ...args)
       : () => null;
 
     this._disabled.not = (selector) => this._disabled(selector, true);
@@ -131,7 +126,7 @@ export class AsyncRunner {
         ].join('\n');
         throw error;
       } finally {
-        this.log(`Action ${counter}:`, caller.name, 'finished')
+        this.log(`Action ${counter}:`, caller.name, 'finished');
       }
     };
   }
@@ -196,12 +191,12 @@ export class AsyncRunner {
   }
 
   _getTarget(selector) {
-    const isBody = typeof(selectors) == 'string' && /^body/i.test(selector);
+    const isBody = typeof (selectors) == 'string' && /^body/i.test(selector);
     return selectElement(isBody ? this.currentPage : this.currentLocator, selector);
   }
 
   _getTargets(selector) {
-    const isBody = typeof(selectors) == 'string' && /^body/i.test(selector);
+    const isBody = typeof (selectors) == 'string' && /^body/i.test(selector);
     return selectElements(isBody ? this.currentPage : this.currentLocator, selector);
   }
 
@@ -225,7 +220,7 @@ export class AsyncRunner {
       (Array.isArray(selectors)
         ? selectors.map(el => (Array.isArray(el) ? [el[0], el[1], el[2]] : [el, count]))
         : (
-          typeof(selectors) == 'string'
+          typeof (selectors) == 'string'
             ? [[selectors, count]]
             : Object.entries(selectors).map(([selector, value]) => {
               const [minCount, maxCount] = Array.isArray(value) ? value : [value, undefined];
@@ -239,7 +234,7 @@ export class AsyncRunner {
         } else if (elements.length < countMin || elements.length > countMax) {
           expectToBe(String(selector), elements.length, `between ${countMin} and ${countMax}`);
         }
-      })
+      }),
     );
   }
 
@@ -277,7 +272,7 @@ export class AsyncRunner {
         element = await this._getTarget(locatorOrSelector);
         return !!element;
       },
-      { timeout: this.targetTimeout, ...options }
+      { timeout: this.targetTimeout, ...options },
     );
     expectToBeDefined(locatorOrSelector, element);
     return element;
@@ -329,7 +324,7 @@ export class AsyncRunner {
           expectNetworkListener(page);
           return page.networkListener?.activeRequests <= minCount;
         },
-        { timeout: 10000, ...restOptions }
+        { timeout: 10000, ...restOptions },
       );
     });
     return this;
@@ -339,7 +334,7 @@ export class AsyncRunner {
     return this._then(this.moveBack, async () => {
       if (stepsNumber >= this.locatorsWay.length) {
         if (this.locatorsWay.length > 1) {
-          console.warn(`moveBack :: not enough steps`);
+          console.warn('moveBack :: not enough steps');
         }
         this.locatorsWay = this.locatorsWay.slice(0, 1);
       } else {
@@ -429,8 +424,8 @@ export class AsyncRunner {
         const received = [];
         const expected = [];
         result.forEach(([k, r, e], i) => {
-          received.push(`${i+1}. ${k}: ${r};`);
-          expected.push(`${i+1}. ${k}: ${e};`);
+          received.push(`${i + 1}. ${k}: ${r};`);
+          expected.push(`${i + 1}. ${k}: ${e};`);
         });
         expectToBe(`${selector} Styles:`, received.join('\n'), expected.join('\n'));
       }
@@ -452,8 +447,8 @@ export class AsyncRunner {
         const received = [];
         const expected = [];
         result.forEach(([k, r, e], i) => {
-          received.push(`${i+1}. ${k}=${r}`);
-          expected.push(`${i+1}. ${k}=${e}`);
+          received.push(`${i + 1}. ${k}=${r}`);
+          expected.push(`${i + 1}. ${k}=${e}`);
         });
         expectToBe(`${selector} Attributes:`, received.join('\n'), expected.join('\n'));
       }
@@ -495,9 +490,9 @@ export class AsyncRunner {
                 ? (await value(name, i, field))
                 : value;
               await field.type(String(fieldValue));
-            })
+            }),
           );
-        })
+        }),
       );
     });
   }
@@ -507,7 +502,7 @@ export class AsyncRunner {
       const target = await this._waitTarget(selector, options);
       await this._disabled.not(target);
       await promiseFlow(
-        (Array.isArray(button) ? button : [button]).map((el) => () => target.press(el))
+        (Array.isArray(button) ? button : [button]).map((el) => () => target.press(el)),
       );
     });
   }
@@ -597,7 +592,7 @@ export class AsyncRunner {
       const { currentPage } = this;
       await currentPage.reload({ timeout, waitUntil: 'networkidle0' });
       if (waitForLocator) {
-        await expect(currentPage.locator(waitForSelector)).toBeVisible();
+        await expect(currentPage.locator(waitForLocator)).toBeVisible();
       }
     });
   }
@@ -645,14 +640,14 @@ export class AsyncRunner {
         target = await this._waitTarget(selector);
       }
       expectToBeDefined(selector, target);
-      await this.screenshoter(target, name);
+      await this.screenshotTool(target, name);
       // await target.dispose();
     });
   }
 
   savePageShot(name) {
     return this._then(this.savePageShot, async () => {
-      await this.screenshoter(this.currentPage, { name, fullPage: true });
+      await this.screenshotTool(this.currentPage, { name, fullPage: true });
     });
   }
 
@@ -664,17 +659,17 @@ export class AsyncRunner {
       }
       expectToBeDefined(selector, target);
 
-      const fullName = this.screenshoter?.getFullName(name);
+      const fullName = this.screenshotTool?.getFullName(name);
       const isExists = fullName && fs.existsSync(fullName);
       const save = saveCurrent || this.updateShot || !isExists;
-      const current = await this.screenshoter(target, { name, save, returnBuffer: !save });
+      const current = await this.screenshotTool(target, { name, save, returnBuffer: !save });
 
       if (save) {
         console.log('Save shot: ', current);
       } else {
         const { count, diff } = diffImages(fullName, current);
         if (count > 0) {
-          throw new ShotMatchError(this.screenshoter.getCurrentName(name), count, diff);
+          throw new ShotMatchError(this.screenshotTool.getCurrentName(name), count, diff);
         }
       }
     });
@@ -724,6 +719,15 @@ export class AsyncRunner {
   }
 }
 
-function defaultScreenshoter() {
-  throw new Error('You should put "screenshoter" as additional option');
+export function newRunner(pageOrLocator, config = {}) {
+  if (!pageOrLocator) {
+    throw new Error('Initial locator should be defined');
+  }
+  return new AsyncRunner(
+    isPage(pageOrLocator) ? pageOrLocator.locator('body') : pageOrLocator,
+    {
+      updateShot: process.env.NODE_MODE == 'update',
+      ...config,
+    },
+  );
 }

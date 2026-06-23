@@ -5,7 +5,8 @@ export function createDirDeep(dir) {
   if (!fs.existsSync(dir)) {
     try {
       fs.mkdirSync(dir, { recursive: true });
-      console.log(`Created direcory [${dir}]`);
+      // eslint-disable-next-line no-console
+      console.log(`Created directory [${dir}]`);
       return true;
     } catch (error) {
       console.error(error);
