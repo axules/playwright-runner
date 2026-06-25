@@ -61,22 +61,11 @@ async function getAttributesInContent(node, selectAttr) {
   );
 }
 
-export function getElementType(element) {
-  if (
-    element
-    && element.$
-    && element.constructor
-    && element.constructor.name
-    && ['Page', 'Frame', 'ElementHandle'].includes(element.constructor.name)
-  ) {
-    return element.constructor.name;
-  }
-
-  return null;
-}
-
 export function isPage(element) {
-  return element && getElementType(element) === 'Page';
+  return element
+    && element.localStorage
+    && element.constructor
+    && ['Page', '_Page'].includes(element.constructor.name);
 }
 
 export function getPage(element) {

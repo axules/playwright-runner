@@ -190,14 +190,14 @@ export class AsyncRunner {
     return this.currentPage.waitForNavigation(options);
   }
 
-  _getTarget(selector) {
-    const isBody = typeof (selectors) == 'string' && /^body/i.test(selector);
-    return selectElement(isBody ? this.currentPage : this.currentLocator, selector);
+  _getTarget(selectors) {
+    const isBody = typeof (selectors) === 'string' && /^body/i.test(selectors);
+    return selectElement(isBody ? this.currentPage : this.currentLocator, selectors);
   }
 
-  _getTargets(selector) {
-    const isBody = typeof (selectors) == 'string' && /^body/i.test(selector);
-    return selectElements(isBody ? this.currentPage : this.currentLocator, selector);
+  _getTargets(selectors) {
+    const isBody = typeof (selectors) === 'string' && /^body/i.test(selectors);
+    return selectElements(isBody ? this.currentPage : this.currentLocator, selectors);
   }
 
   async _disabled(selector, not = false) {
@@ -220,7 +220,7 @@ export class AsyncRunner {
       (Array.isArray(selectors)
         ? selectors.map(el => (Array.isArray(el) ? [el[0], el[1], el[2]] : [el, count]))
         : (
-          typeof (selectors) == 'string'
+          typeof (selectors) === 'string'
             ? [[selectors, count]]
             : Object.entries(selectors).map(([selector, value]) => {
               const [minCount, maxCount] = Array.isArray(value) ? value : [value, undefined];
@@ -370,12 +370,14 @@ export class AsyncRunner {
 
   where() {
     return this._then(this.where, async () => {
+      // eslint-disable-next-line no-console
       console.log('I am here: ', this.currentLocator);
     });
   }
 
   fullWay() {
     return this._then(this.fullWay, async () => {
+      // eslint-disable-next-line no-console
       console.log('I was here: ', this.locatorsWay.join(' -->> '));
     });
   }
@@ -413,13 +415,14 @@ export class AsyncRunner {
       const target = await this._waitTarget(selector);
       const expectedCss = styles.map(el => el.split(':')).reduce((R, [k, v]) => Object.assign(R, { [k.trim()]: v.trim() }), {});
       const currentCss = await getStyles(target, Object.keys(expectedCss));
-      const result = Object.entries(expectedCss).reduce((R, [key, expected]) => {
-        const current = currentCss[key];
-        if (expected instanceof RegExp ? !current.match(expected) : current != expected) {
-          R.push([key, current, expected]);
-        }
-        return R;
-      }, []);
+      const result = Object.entries(expectedCss)
+        .reduce((R, [key, expected]) => {
+          const current = currentCss[key];
+          if (expected instanceof RegExp ? !current.match(expected) : current != expected) {
+            R.push([key, current, expected]);
+          }
+          return R;
+        }, []);
       if (result.length > 0) {
         const received = [];
         const expected = [];
@@ -436,13 +439,14 @@ export class AsyncRunner {
     return this._then(this.matchAttr, async () => {
       const target = await this._waitTarget(selector);
       const currentAttr = await getAttributes(target, Object.keys(attr));
-      const result = Object.entries(attr).reduce((R, [key, expected]) => {
-        const current = currentAttr[key];
-        if (expected instanceof RegExp ? !current.match(expected) : current != expected) {
-          R.push([key, current, expected]);
-        }
-        return R;
-      }, []);
+      const result = Object.entries(attr)
+        .reduce((R, [key, expected]) => {
+          const current = currentAttr[key];
+          if (expected instanceof RegExp ? !current.match(expected) : current != expected) {
+            R.push([key, current, expected]);
+          }
+          return R;
+        }, []);
       if (result.length > 0) {
         const received = [];
         const expected = [];
@@ -553,11 +557,12 @@ export class AsyncRunner {
     return this._then(this.hasQueryParams, async () => {
       throw new Error('IMPLEMENT IT');
       let result = [];
+
       await this._waitPromise(() => {
         const currentParams = resolveUrlSearchParams(Array.from(this.currentUrl.searchParams));
         result = matchObject(currentParams, expectedParams, strict)
           .map(([k, r, e]) => [`${k}=${r}`, `${k}=${e}`]);
-        return result.length == 0;
+        return result.length <= 0;
       });
 
       if (result.length) {
@@ -572,7 +577,8 @@ export class AsyncRunner {
 
   say(text) {
     return this._then(this.say, async () => {
-      console.log(text);
+      // eslint-disable-next-line no-console
+      console.info(text);
     });
   }
 
@@ -726,7 +732,7 @@ export function newRunner(pageOrLocator, config = {}) {
   return new AsyncRunner(
     isPage(pageOrLocator) ? pageOrLocator.locator('body') : pageOrLocator,
     {
-      updateShot: process.env.NODE_MODE == 'update',
+      updateShot: process.env.NODE_MODE === 'update',
       ...config,
     },
   );
