@@ -25,10 +25,16 @@
     "eslint-plugin-simple-import-sort": "13.0.0",
     "eslint-presets": "github:axules/eslint-presets#v1.0.7",
     "jest": "30.4.2",
+    "playwright": "1.61.1"
+  },
+  "peerDependencies": {
+    "@playwright/test": "1.x - x",
+    "playwright": "1.x - x"
+  },
+  "dependencies": {
+    "lodash.isstring": "4.0.1",
     "jpeg-js": "0.4.4",
-    "pixelmatch": "7.2.0",
-    "playwright": "1.61.1",
-    "lodash.isstring": "4.0.1"
+    "pixelmatch": "7.2.0"
   },
   "overrides": {
     "eslint": "10.5.0"
