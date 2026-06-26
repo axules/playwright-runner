@@ -4,12 +4,22 @@
   "description": "Playwright helper tools",
   "license": "ISC",
   "author": "Denis Shelest <axules@mail.ru>",
-  "main": "index.js",
   "scripts": {
     "test": "jest",
     "example": "npx playwright test",
-    "report": "npx playwright show-report"
+    "report": "npx playwright show-report",
+    "build": "babel --delete-dir-on-start -d dist src --ignore **/*.test.js"
   },
+  "main": "./dist/runner.js",
+  "exports": {
+    ".": "./dist/runner.js",
+    "./runner": "./dist/runner.js",
+    "./tools/*": "./dist/tools/*.js"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "devDependencies": {
     "@babel/cli": "8.0.1",
     "@babel/core": "8.0.1",

@@ -1,14 +1,12 @@
 const envConfig = {
   development: {
     presets: [],
-    plugins: [
-    ]
+    plugins: [],
   },
   production: {
     presets: [],
-    plugins: [
-    ]
-  }
+    plugins: [],
+  },
 };
 
 module.exports = function (api) {
@@ -19,12 +17,13 @@ module.exports = function (api) {
 
   return {
     plugins: [
-      ...additional.plugins
+      ...additional.plugins,
     ],
+
     presets: [
-      ['@babel/preset-env'],
-      ...(additional.presets || [])
-    ]
+      ['@babel/preset-env', { targets: { node: '22' } }],
+      ...(additional.presets || []),
+    ],
 
   };
 };
