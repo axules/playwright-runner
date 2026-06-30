@@ -17,6 +17,8 @@ describe('parseCssSelector', () => {
 
     // :@text
     [':@text without quotes', 'div:@text(Submit)', ['div', { method: 'text', arg: 'Submit' }]],
+    [':@text with quotes', 'div:@text("Submit")', ['div', { method: 'text', arg: 'Submit' }]],
+    [':@text with quotes', 'div:@text("Submit (success)")', ['div', { method: 'text', arg: 'Submit (success)' }]],
     [
       ':@text with quoted argument containing parentheses',
       'div:@text("Submit (123 label")',

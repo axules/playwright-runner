@@ -54,7 +54,7 @@ export function parseCssSelector(selector) {
   let execResult;
   let cursor = 0;
   // e.g. :@text(Any text), :@role(button), :@label(any label), :@placeholder(any text)
-  const customMethodsRegexp = /(>?\s?[*])??:@([a-z\d]+)\((([^)(]+?)|\s*"(.+?)"\s*)\)/gi;
+  const customMethodsRegexp = /(>?\s?[*])??:@([a-z\d]+)\((\s*"(.+?)"\s*|([^)(]+?))\)/gi;
   while ((execResult = customMethodsRegexp.exec(selector))) {
     const [, node, method, , arg, argFallback] = execResult;
     if (!node && /\s/.test(selector[execResult.index - 1])) {
@@ -65,7 +65,10 @@ export function parseCssSelector(selector) {
     cursor = customMethodsRegexp.lastIndex;
   }
   pieces.push(selector.slice(cursor).trim());
-  return pieces.filter(Boolean);
+  return pieces.filter((it) => {
+    if (/:@/.test(it)) throw new Error(`Custom function is wrong and was not parsed: ${it}`);
+    return !!it;
+  });
 }
 
 /**
