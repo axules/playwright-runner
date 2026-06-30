@@ -1,68 +1,87 @@
-import { expect } from '@playwright/test';
-import fs from 'fs';
-import { Locator } from 'playwright-core';
-import { diffImages } from './tools/diffImages';
-import { toGreenText, toRedText } from './tools/makeExpectedError';
-import MatcherError from './tools/MatcherError';
-import PageNetworkListener from './tools/PageNetworkListener';
-import { resolveLocator } from './tools/resolveLocator';
-import ShotMatchError from './tools/ShotMatchError';
-import { getAttributes, getPage, getStyles, isPage, matchObject, matchString, promiseFlow, resolveUrlSearchParams, selectElement, selectElements } from './tools/utils';
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.PageRunner = void 0;
+var _test = require("@playwright/test");
+var _fs = _interopRequireDefault(require("fs"));
+var _diffImages = require("./tools/diffImages");
+var _makeExpectedError = require("./tools/makeExpectedError");
+var _MatcherError = _interopRequireDefault(require("./tools/MatcherError"));
+var _PageNetworkListener = _interopRequireDefault(require("./tools/PageNetworkListener"));
+var _ShotMatchError = _interopRequireDefault(require("./tools/ShotMatchError"));
+var _utils = require("./tools/utils");
+var _resolveCssLocator = require("./tools/resolveCssLocator");
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function expectToBeDefined(name, received) {
   if (typeof received === 'undefined') {
-    throw new MatcherError(`${toRedText(name)} Should be defined`, 'undefined', 'any');
+    throw new _MatcherError.default(`${(0, _makeExpectedError.toRedText)(name)} Should be defined`, 'undefined', 'any');
   }
   return true;
 }
 function expectToBe(name, received, expected) {
   if (received !== expected) {
-    throw new MatcherError(toRedText(name), received, expected);
+    throw new _MatcherError.default((0, _makeExpectedError.toRedText)(name), received, expected);
   }
   return true;
 }
 function expectNetworkListener(page) {
   if (!page.networkListener) {
-    throw new MatcherError(`${toRedText(page.networkListener)} is undefined.\nUse ${toGreenText('page.networkListener = new PageNetworkListener(page)')} after open this page`, 'undefined', 'PageNetworkListener object');
+    throw new _MatcherError.default(`${(0, _makeExpectedError.toRedText)(page.networkListener)} is undefined.\nUse ${(0, _makeExpectedError.toGreenText)('page.networkListener = new PageNetworkListener(page)')} after open this page`, 'undefined', 'PageNetworkListener object');
   }
   return true;
 }
 function expectNetworkListenerIsActive(page) {
   expectNetworkListener(page);
   if (!page.networkListener.active) {
-    throw new MatcherError(`networkListener is not active.\nUse ${toGreenText('toListenNetwork()')} before action that should send request to activate listening.\n And ${toGreenText('toStopListenNetwork()')} after checking`, 'page.networkListener.active=false', 'page.networkListener.active=true');
+    throw new _MatcherError.default(`networkListener is not active.\nUse ${(0, _makeExpectedError.toGreenText)('toListenNetwork()')} before action that should send request to activate listening.\n And ${(0, _makeExpectedError.toGreenText)('toStopListenNetwork()')} after checking`, 'page.networkListener.active=false', 'page.networkListener.active=true');
   }
   return true;
 }
 function initNetworkListener(page) {
   if (!page.networkListener) {
-    page.networkListener = new PageNetworkListener(page);
+    page.networkListener = new _PageNetworkListener.default(page);
   }
 }
 function defaultScreenshotMaster() {
   throw new Error('You should put "screenshot tool" as additional option');
 }
-export class AsyncRunner {
+class PageRunner {
+  static create(...args) {
+    return new this(...args);
+  }
   constructor(initialLocator, options = {}) {
-    const {
-      debug = false,
-      updateShot = false,
-      screenshotTool = defaultScreenshotMaster,
-      targetTimeout = 2500
-    } = options;
-    this.runCallerCounter = 0;
-    this.locatorsWay = [initialLocator];
-    this.page = getPage(initialLocator);
-    initNetworkListener(this.page);
-    this.targetTimeout = targetTimeout;
-    this.updateShot = updateShot;
-    this.screenshotTool = screenshotTool;
-    this.pull = [];
-    this.debug = debug || false;
-    this.log = this.debug ? (...args) => console.log(new Date().toISOString().replace('T', ' ').slice(10, 23), ...args) : () => null;
-    this._disabled.not = selector => this._disabled(selector, true);
-    this._checked.not = selector => this._checked(selector, true);
-    this._has.not = selectors => this._has(selectors, true);
-    this.log('New runner created', initialLocator, options);
+    if (!initialLocator) {
+      throw new Error('Initial locator should be defined');
+    }
+    const locator = (0, _utils.isPage)(initialLocator) ? initialLocator.locator('body') : initialLocator;
+    this.init = () => {
+      const {
+        debug = false,
+        updateShot = false,
+        screenshotTool = defaultScreenshotMaster,
+        targetTimeout = 2500
+      } = options;
+      this.runCallerCounter = 0;
+      this.locatorsWay = [locator];
+      this.page = (0, _utils.getPage)(locator);
+      initNetworkListener(this.page);
+      this.targetTimeout = targetTimeout;
+      this.updateShot = updateShot;
+      this.screenshotTool = screenshotTool;
+      this.pull = [];
+      this.debug = debug || false;
+      if (this.debug) {
+        // eslint-disable-next-line no-console
+        this.log = (...args) => console.log(new Date().toISOString().replace('T', ' ').slice(10, 23), ...args);
+      }
+      this._disabled.not = selector => this._disabled(selector, true);
+      this._checked.not = selector => this._checked(selector, true);
+      this._has.not = selectors => this._has(selectors, true);
+    };
+    this.init();
+    this.log('New runner created', locator, options);
   }
   _createMatcher(caller, action, initError) {
     return async (...args) => {
@@ -88,7 +107,7 @@ export class AsyncRunner {
    *
    * @param caller
    * @param nextAction
-   * @returns {AsyncRunner}
+   * @returns {PageRunner}
    * @private
    */
   _then(caller, nextAction) {
@@ -105,6 +124,8 @@ export class AsyncRunner {
     }
     return this;
   }
+  log() {}
+  init() {}
 
   /**
    * Use to get current Playwright Locator
@@ -134,18 +155,18 @@ export class AsyncRunner {
    * @returns {Locator}
    */
   find(locatorOrSelector = undefined) {
-    return locatorOrSelector ? resolveLocator(this.currentLocator, locatorOrSelector) : this.currentLocator;
+    return locatorOrSelector ? (0, _resolveCssLocator.resolveCssLocator)(this.currentLocator, locatorOrSelector) : this.currentLocator;
   }
   _waitForNavigation(options) {
     return this.currentPage.waitForNavigation(options);
   }
   _getTarget(selectors) {
     const isBody = typeof selectors === 'string' && /^body/i.test(selectors);
-    return selectElement(isBody ? this.currentPage : this.currentLocator, selectors);
+    return (0, _utils.selectElement)(isBody ? this.currentPage : this.currentLocator, selectors);
   }
   _getTargets(selectors) {
     const isBody = typeof selectors === 'string' && /^body/i.test(selectors);
-    return selectElements(isBody ? this.currentPage : this.currentLocator, selectors);
+    return (0, _utils.selectElements)(isBody ? this.currentPage : this.currentLocator, selectors);
   }
   async _disabled(selector, not = false) {
     const target = await this._getTarget(selector);
@@ -312,12 +333,12 @@ export class AsyncRunner {
   }
   see(selector = null) {
     return this._then(this.see, async () => {
-      await expect(this.find(selector)).toBeVisible();
+      await (0, _test.expect)(this.find(selector)).toBeVisible();
     });
   }
   dontSee(selector = undefined) {
     return this._then(this.dontSee, async () => {
-      await expect(this.find(selector)).toBeHidden();
+      await (0, _test.expect)(this.find(selector)).toBeHidden();
     });
   }
   enabled(selector = null) {
@@ -340,7 +361,7 @@ export class AsyncRunner {
       const expectedCss = styles.map(el => el.split(':')).reduce((R, [k, v]) => Object.assign(R, {
         [k.trim()]: v.trim()
       }), {});
-      const currentCss = await getStyles(target, Object.keys(expectedCss));
+      const currentCss = await (0, _utils.getStyles)(target, Object.keys(expectedCss));
       const result = Object.entries(expectedCss).reduce((R, [key, expected]) => {
         const current = currentCss[key];
         if (expected instanceof RegExp ? !current.match(expected) : current != expected) {
@@ -362,7 +383,7 @@ export class AsyncRunner {
   matchAttr(selector, attr) {
     return this._then(this.matchAttr, async () => {
       const target = await this._waitTarget(selector);
-      const currentAttr = await getAttributes(target, Object.keys(attr));
+      const currentAttr = await (0, _utils.getAttributes)(target, Object.keys(attr));
       const result = Object.entries(attr).reduce((R, [key, expected]) => {
         const current = currentAttr[key];
         if (expected instanceof RegExp ? !current.match(expected) : current != expected) {
@@ -384,14 +405,14 @@ export class AsyncRunner {
   click(selector = undefined, options = undefined) {
     return this._then(this.click, async () => {
       const locator = this.find(selector);
-      await expect(locator).toBeEnabled();
+      await (0, _test.expect)(locator).toBeEnabled();
       await locator.click(options);
     });
   }
   fill(selector, text, options = undefined) {
     return this._then(this.fill, async () => {
       const locator = this.find(selector);
-      await expect(locator).toBeEnabled();
+      await (0, _test.expect)(locator).toBeEnabled();
       await locator.fill(text, options);
     });
   }
@@ -399,13 +420,13 @@ export class AsyncRunner {
     return this._then(this.fillForm, async () => {
       const form = await this._waitTarget(selector);
       await this._disabled.not(form);
-      await promiseFlow(Object.entries(data).map(([name, value]) => async () => {
+      await (0, _utils.promiseFlow)(Object.entries(data).map(([name, value]) => async () => {
         const inputSelector = `[name="${name}"]`;
-        const fields = Array.from(await selectElements(form, inputSelector));
+        const fields = Array.from(await (0, _utils.selectElements)(form, inputSelector));
         if (fields.length === 0) {
           expectToBe(`${inputSelector} should be found in ${selector}`, fields.length, ' > 0');
         }
-        return promiseFlow(fields.map((field, i) => async () => {
+        return (0, _utils.promiseFlow)(fields.map((field, i) => async () => {
           await field.click({
             clickCount: 3
           });
@@ -419,24 +440,24 @@ export class AsyncRunner {
     return this._then(this.press, async () => {
       const target = await this._waitTarget(selector, options);
       await this._disabled.not(target);
-      await promiseFlow((Array.isArray(button) ? button : [button]).map(el => () => target.press(el)));
+      await (0, _utils.promiseFlow)((Array.isArray(button) ? button : [button]).map(el => () => target.press(el)));
     });
   }
   seeText(text) {
     return this._then(this.seeText, async () => {
-      await expect(this.currentLocator).toContainText(text);
+      await (0, _test.expect)(this.currentLocator).toContainText(text);
     });
   }
   seeExactText(text) {
     return this._then(this.seeExactText, async () => {
-      await expect(this.currentLocator).toHaveText(text);
+      await (0, _test.expect)(this.currentLocator).toHaveText(text);
     });
   }
   matchValue(selector, value, strict = false) {
     return this._then(this.matchValue, async () => {
       const target = await this._waitTarget(selector);
       const targetValue = await target.evaluate(el => el.value);
-      if (!matchString(targetValue, value, strict)) {
+      if (!(0, _utils.matchString)(targetValue, value, strict)) {
         expectToBe(selector, targetValue, strict ? value : `contains '${value}'`);
       }
     });
@@ -444,11 +465,11 @@ export class AsyncRunner {
   hasUrl(urlOrPath) {
     return this._then(this.hasUrl, async () => {
       if (urlOrPath.startsWith('*/')) {
-        await expect(this.currentPage).toHaveURL(this.currentUrl.origin + urlOrPath.slice(1));
+        await (0, _test.expect)(this.currentPage).toHaveURL(this.currentUrl.origin + urlOrPath.slice(1));
       } else if (urlOrPath.startsWith('**/')) {
-        await expect(this.currentPage).toHaveURL(new RegExp(`.+${urlOrPath.slice(2)}`));
+        await (0, _test.expect)(this.currentPage).toHaveURL(new RegExp(`.+${urlOrPath.slice(2)}`));
       } else {
-        await expect(this.currentPage).toHaveURL(urlOrPath);
+        await (0, _test.expect)(this.currentPage).toHaveURL(urlOrPath);
       }
       // let currentPath = '';
       // const isOk = await this._waitPromise(() => {
@@ -465,8 +486,8 @@ export class AsyncRunner {
       throw new Error('IMPLEMENT IT');
       let result = [];
       await this._waitPromise(() => {
-        const currentParams = resolveUrlSearchParams(Array.from(this.currentUrl.searchParams));
-        result = matchObject(currentParams, expectedParams, strict).map(([k, r, e]) => [`${k}=${r}`, `${k}=${e}`]);
+        const currentParams = (0, _utils.resolveUrlSearchParams)(Array.from(this.currentUrl.searchParams));
+        result = (0, _utils.matchObject)(currentParams, expectedParams, strict).map(([k, r, e]) => [`${k}=${r}`, `${k}=${e}`]);
         return result.length <= 0;
       });
       if (result.length) {
@@ -491,7 +512,7 @@ export class AsyncRunner {
         waitUntil: 'networkidle0'
       });
       if (waitForSelector) {
-        await expect(currentPage.locator(waitForSelector)).toBeVisible();
+        await (0, _test.expect)(currentPage.locator(waitForSelector)).toBeVisible();
       }
     });
   }
@@ -505,7 +526,7 @@ export class AsyncRunner {
         waitUntil: 'networkidle0'
       });
       if (waitForLocator) {
-        await expect(currentPage.locator(waitForLocator)).toBeVisible();
+        await (0, _test.expect)(currentPage.locator(waitForLocator)).toBeVisible();
       }
     });
   }
@@ -566,7 +587,7 @@ export class AsyncRunner {
       }
       expectToBeDefined(selector, target);
       const fullName = this.screenshotTool?.getFullName(name);
-      const isExists = fullName && fs.existsSync(fullName);
+      const isExists = fullName && _fs.default.existsSync(fullName);
       const save = saveCurrent || this.updateShot || !isExists;
       const current = await this.screenshotTool(target, {
         name,
@@ -579,9 +600,9 @@ export class AsyncRunner {
         const {
           count,
           diff
-        } = diffImages(fullName, current);
+        } = (0, _diffImages.diffImages)(fullName, current);
         if (count > 0) {
-          throw new ShotMatchError(this.screenshotTool.getCurrentName(name), count, diff);
+          throw new _ShotMatchError.default(this.screenshotTool.getCurrentName(name), count, diff);
         }
       }
     });
@@ -631,12 +652,4 @@ export class AsyncRunner {
     });
   }
 }
-export function newRunner(pageOrLocator, config = {}) {
-  if (!pageOrLocator) {
-    throw new Error('Initial locator should be defined');
-  }
-  return new AsyncRunner(isPage(pageOrLocator) ? pageOrLocator.locator('body') : pageOrLocator, {
-    updateShot: process.env.NODE_MODE === 'update',
-    ...config
-  });
-}
+exports.PageRunner = PageRunner;

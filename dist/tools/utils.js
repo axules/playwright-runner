@@ -1,11 +1,29 @@
-export async function selectElement(container, selector) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.clearPath = clearPath;
+exports.getAttributes = getAttributes;
+exports.getPage = getPage;
+exports.getStyles = getStyles;
+exports.getYMD = getYMD;
+exports.isPage = isPage;
+exports.isVisible = isVisible;
+exports.matchObject = matchObject;
+exports.matchString = matchString;
+exports.promiseFlow = promiseFlow;
+exports.resolveUrlSearchParams = resolveUrlSearchParams;
+exports.selectElement = selectElement;
+exports.selectElements = selectElements;
+async function selectElement(container, selector) {
   if (selector && selector.$ && selector.$$) return selector;
   if (!selector) return undefined;
   const [nodeSelector, n = 0] = Array.isArray(selector) ? selector : [selector, 0];
   if (nodeSelector[0] == '/') return (await container.$x(nodeSelector))[n];
   return (n > 0 ? (await container.$$(nodeSelector))[n] : await container.$(nodeSelector)) || undefined;
 }
-export async function selectElements(container, selector) {
+async function selectElements(container, selector) {
   if (!selector) return [];
   if (selector && selector.locator && selector.waitFor) {
     return [selector];
@@ -34,23 +52,23 @@ async function getAttributesInContent(node, selectAttr) {
     }, {});
   }, select);
 }
-export function isPage(element) {
+function isPage(element) {
   return element && element.localStorage && element.constructor && ['Page', '_Page'].includes(element.constructor.name);
 }
-export function getPage(element) {
+function getPage(element) {
   if (!element) return null;
   if (isPage(element)) return element;
   return element._page || element?._frame?._page;
   // const frame = await(await element.executionContext()).frame();
   // return frame?._frameManager?._page || frame;
 }
-export async function getStyles(node, styles) {
+async function getStyles(node, styles) {
   return getStyleInContent(await getPage(node), node, styles);
 }
-export async function getAttributes(node, attributes) {
+async function getAttributes(node, attributes) {
   return getAttributesInContent(node, attributes);
 }
-export async function isVisible(elements) {
+async function isVisible(elements) {
   async function isVisibleBox(element) {
     // const rect = element.getBoundingClientRect();
     const rect = await element.boundingBox();
@@ -64,13 +82,13 @@ export async function isVisible(elements) {
     return style.visibility !== 'dontSee' && parseFloat(style.opacity || 1) > 0 && (await isVisibleBox(el));
   });
 }
-export function getYMD(date = new Date()) {
+function getYMD(date = new Date()) {
   return [date.getFullYear(), date.getMonth() + 1, date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds()].map(el => String(el).length >= 2 ? el : `00${el}`.slice(-2)).join('_');
 }
-export function clearPath(str) {
+function clearPath(str) {
   return str.replace(/[?/\\:<>|"*]/g, '-');
 }
-export function promiseFlow(list = []) {
+function promiseFlow(list = []) {
   if (list.length === 0) return Promise.resolve();
   if (typeof list[0] !== 'function') {
     throw new Error('promiseFlow - list[0] is not function');
@@ -84,7 +102,7 @@ export function promiseFlow(list = []) {
   }
   return point;
 }
-export function resolveUrlSearchParams(params) {
+function resolveUrlSearchParams(params) {
   const result = {};
   params.forEach(([k, v]) => {
     if (!result[k]) result[k] = [];
@@ -97,10 +115,10 @@ export function resolveUrlSearchParams(params) {
   });
   return result;
 }
-export function matchString(received, expected, strict = false) {
+function matchString(received, expected, strict = false) {
   return expected instanceof RegExp ? !!received.match(expected) : strict || !expected ? received == expected : received.includes(expected);
 }
-export function matchObject(received, expected, strict = false) {
+function matchObject(received, expected, strict = false) {
   const diff = Object.entries(expected).map(el => [el[0], undefined, el[1]]);
   const additional = [];
   Object.entries(received).forEach(([k, actual]) => {

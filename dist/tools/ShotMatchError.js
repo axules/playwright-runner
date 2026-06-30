@@ -1,4 +1,10 @@
-export default class ShotMatchError extends Error {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+class ShotMatchError extends Error {
   constructor(name, count, diff) {
     super('Screenshots have diffirence');
     this.diffName = name;
@@ -7,3 +13,4 @@ export default class ShotMatchError extends Error {
     this.name = 'ShotMatchError';
   }
 }
+exports.default = ShotMatchError;

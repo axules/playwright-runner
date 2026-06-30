@@ -1,5 +1,8 @@
 // @ts-check
-import { defineConfig, devices } from '@playwright/test';
+import {
+  defineConfig,
+  devices,
+} from '@playwright/test';
 
 /**
  * Read environment variables from file.
@@ -14,7 +17,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   timeout: 5_000,
-  waitUntil: 'networkidle0',
+  waitUntil: 'networkidle',
   preserveOutput: 'failures-only',
   testDir: './examples',
   testMatch: '*.uitest.js',
@@ -29,8 +32,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
-    ['html', { open: 'never'} ],
-    ['list', { printSteps: true }]
+    ['html', { open: 'never' }],
+    ['list', { printSteps: true }],
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {

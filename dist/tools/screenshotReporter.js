@@ -1,7 +1,14 @@
-import fs from 'fs';
-import path from 'path';
-import { takeScreenshot } from './takeScreenshot';
-export async function addScreenshotReporter() {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.addScreenshotReporter = addScreenshotReporter;
+var _fs = _interopRequireDefault(require("fs"));
+var _path = _interopRequireDefault(require("path"));
+var _takeScreenshot = require("./takeScreenshot");
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+async function addScreenshotReporter() {
   /* global jasmine */
 
   // const options = {

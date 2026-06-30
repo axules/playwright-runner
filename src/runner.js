@@ -1,6 +1,5 @@
 import { expect } from '@playwright/test';
 import fs from 'fs';
-import { Locator } from 'playwright-core';
 
 import { diffImages } from './tools/diffImages';
 import {
@@ -9,7 +8,6 @@ import {
 } from './tools/makeExpectedError';
 import MatcherError from './tools/MatcherError';
 import PageNetworkListener from './tools/PageNetworkListener';
-import { resolveLocator } from './tools/resolveLocator';
 import ShotMatchError from './tools/ShotMatchError';
 import {
   getAttributes,
@@ -23,6 +21,7 @@ import {
   selectElement,
   selectElements,
 } from './tools/utils';
+import { resolveCssLocator } from './tools/resolveCssLocator';
 
 
 function expectToBeDefined(name, received) {
@@ -72,36 +71,52 @@ function defaultScreenshotMaster() {
   throw new Error('You should put "screenshot tool" as additional option');
 }
 
-export class AsyncRunner {
+export class PageRunner {
+  static create(...args) {
+    return new this(...args);
+  }
+
   constructor(initialLocator, options = {}) {
-    const {
-      debug = false,
-      updateShot = false,
-      screenshotTool = defaultScreenshotMaster,
-      targetTimeout = 2500,
-    } = options;
+    if (!initialLocator) {
+      throw new Error('Initial locator should be defined');
+    }
+    const locator = isPage(initialLocator) ? initialLocator.locator('body') : initialLocator;
 
-    this.runCallerCounter = 0;
-    this.locatorsWay = [initialLocator];
-    this.page = getPage(initialLocator);
-    initNetworkListener(this.page);
+    this.init = () => {
+      const {
+        debug = false,
+        updateShot = false,
+        screenshotTool = defaultScreenshotMaster,
+        targetTimeout = 2500,
+      } = options;
 
-    this.targetTimeout = targetTimeout;
-    this.updateShot = updateShot;
-    this.screenshotTool = screenshotTool;
-    this.pull = [];
-    this.debug = debug || false;
-    this.log = this.debug
-      ? (...args) => console.log(new Date().toISOString()
-        .replace('T', ' ')
-        .slice(10, 23), ...args)
-      : () => null;
+      this.runCallerCounter = 0;
+      this.locatorsWay = [locator];
+      this.page = getPage(locator);
+      initNetworkListener(this.page);
 
-    this._disabled.not = (selector) => this._disabled(selector, true);
-    this._checked.not = (selector) => this._checked(selector, true);
-    this._has.not = (selectors) => this._has(selectors, true);
+      this.targetTimeout = targetTimeout;
+      this.updateShot = updateShot;
+      this.screenshotTool = screenshotTool;
+      this.pull = [];
+      this.debug = debug || false;
+      if (this.debug) {
+        // eslint-disable-next-line no-console
+        this.log = (...args) => console.log(
+          new Date().toISOString()
+            .replace('T', ' ')
+            .slice(10, 23),
+          ...args,
+        );
+      }
 
-    this.log('New runner created', initialLocator, options);
+      this._disabled.not = (selector) => this._disabled(selector, true);
+      this._checked.not = (selector) => this._checked(selector, true);
+      this._has.not = (selectors) => this._has(selectors, true);
+    };
+
+    this.init();
+    this.log('New runner created', locator, options);
   }
 
   _createMatcher(caller, action, initError) {
@@ -135,7 +150,7 @@ export class AsyncRunner {
    *
    * @param caller
    * @param nextAction
-   * @returns {AsyncRunner}
+   * @returns {PageRunner}
    * @private
    */
   _then(caller, nextAction) {
@@ -153,6 +168,9 @@ export class AsyncRunner {
 
     return this;
   }
+
+  log() {}
+  init() {}
 
   /**
    * Use to get current Playwright Locator
@@ -183,7 +201,7 @@ export class AsyncRunner {
    * @returns {Locator}
    */
   find(locatorOrSelector = undefined) {
-    return locatorOrSelector ? resolveLocator(this.currentLocator, locatorOrSelector) : this.currentLocator;
+    return locatorOrSelector ? resolveCssLocator(this.currentLocator, locatorOrSelector) : this.currentLocator;
   }
 
   _waitForNavigation(options) {
@@ -723,17 +741,4 @@ export class AsyncRunner {
       await matcher(request.response());
     });
   }
-}
-
-export function newRunner(pageOrLocator, config = {}) {
-  if (!pageOrLocator) {
-    throw new Error('Initial locator should be defined');
-  }
-  return new AsyncRunner(
-    isPage(pageOrLocator) ? pageOrLocator.locator('body') : pageOrLocator,
-    {
-      updateShot: process.env.NODE_MODE === 'update',
-      ...config,
-    },
-  );
 }

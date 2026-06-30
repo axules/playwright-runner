@@ -1,7 +1,14 @@
-import fs from 'fs';
-import jpegJs from 'jpeg-js';
-import pixelmatch from 'pixelmatch';
-import { PNG } from 'pngjs';
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.diffImages = diffImages;
+var _fs = _interopRequireDefault(require("fs"));
+var _jpegJs = _interopRequireDefault(require("jpeg-js"));
+var _pixelmatch = _interopRequireDefault(require("pixelmatch"));
+var _pngjs = require("pngjs");
+function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function isString(a) {
   return typeof a === 'string';
 }
@@ -13,24 +20,24 @@ function isPng(fn) {
 }
 function readBuffer(file, defaultPng) {
   if (isString(file)) {
-    const buffer = fs.readFileSync(file);
-    return isPng(file) ? PNG.sync.read(buffer) : jpegJs.decode(buffer);
+    const buffer = _fs.default.readFileSync(file);
+    return isPng(file) ? _pngjs.PNG.sync.read(buffer) : _jpegJs.default.decode(buffer);
   } else {
-    return defaultPng ? PNG.sync.read(file) : jpegJs.decode(file);
+    return defaultPng ? _pngjs.PNG.sync.read(file) : _jpegJs.default.decode(file);
   }
 }
-export function diffImages(expected, actual, threshold = 0.05) {
+function diffImages(expected, actual, threshold = 0.05) {
   const png = isPng(expected) || isPng(actual);
   const expectedBuffer = readBuffer(expected, png);
   const actualBuffer = readBuffer(actual, png);
-  const diff = new PNG({
+  const diff = new _pngjs.PNG({
     width: expectedBuffer.width,
     height: expectedBuffer.height
   });
-  const result = pixelmatch(expectedBuffer.data, actualBuffer.data, diff.data, expectedBuffer.width, expectedBuffer.height, {
+  const result = (0, _pixelmatch.default)(expectedBuffer.data, actualBuffer.data, diff.data, expectedBuffer.width, expectedBuffer.height, {
     threshold
   });
-  diff.save = fn => fs.writeFileSync(fn, PNG.sync.write(diff));
+  diff.save = fn => _fs.default.writeFileSync(fn, _pngjs.PNG.sync.write(diff));
   return {
     count: result,
     diff,

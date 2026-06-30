@@ -1,10 +1,10 @@
 import { test } from '@playwright/test';
 
-import { newRunner } from '../src/runner';
+import { PageRunner } from '../src/runner';
 
 
 test('Check login and registration forms', async ({ page }) => {
-  await newRunner(page, { debug: true })
+  await PageRunner.create(page, { debug: true })
     .goto('https://zapiski.online')
     .moveToChild('.cookiesNotification')
     .seeText('Мы используем cookies для работы сервиса. Продолжая пользоваться сервисом ЗапискиОнлайн, вы принимаете')

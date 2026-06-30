@@ -35,22 +35,23 @@
 ### Entry Point
 
 ```js
-import { newRunner } from '../src/runner';
+import { PageRunner } from '../src/runner';
 
-newRunner(page)                          // basic usage
+PageRunner.create(page)                          // basic usage
   .goto('https://example.com')
   .see('h1')
-  .run();                                // required — executes the chain
+  .run();                                        // required — executes the chain
 
-newRunner(page, { debug: true })         // with debug logging
+PageRunner.create(page, { debug: true })         // with debug logging
   .goto('https://example.com')
   .run();
 ```
 
 ### Dependencies
 
-- **Runtime:** none (zero production dependencies)
-- **Dev:** Playwright, Jest, Babel (ES modules), pixelmatch, jpeg-js, lodash.isstring, eslint, cross-env
+- **Runtime:** `lodash.isstring`, `jpeg-js`, `pixelmatch`
+- **Peer:** `@playwright/test` 1.x - x, `playwright` 1.x - x
+- **Dev:** Playwright, Jest, Babel (ES modules), eslint + plugins, cross-env
 
 ---
 
@@ -65,8 +66,11 @@ playwright-runner/
 ├── playwright.config.js              # Playwright e2e config
 ├── jest.config.js                    # Jest unit test config
 ├── package.json
+├── dist/                             # Built output (Babel transpiled)
+│   ├── runner.js
+│   └── tools/
 ├── src/
-│   ├── runner.js                     # 🔥 CORE: AsyncRunner class + newRunner()
+│   ├── runner.js                     # 🔥 CORE: PageRunner class
 │   └── tools/
 │       ├── createDirDeep.js          # Recursive directory creation
 │       ├── diffImages.js             # Screenshot diff via pixelmatch
@@ -89,15 +93,17 @@ playwright-runner/
 
 ## 🧱 Architecture
 
-### 1. `newRunner(pageOrLocator, config?)` — Entry Point
+### 1. `PageRunner.create(pageOrLocator, config?)` — Entry Point
 
-Creates an `AsyncRunner` instance. If `pageOrLocator` is a Playwright **Page**, it automatically wraps it with `page.locator('body')`.
+Static factory method that creates a `PageRunner` instance. If `pageOrLocator` is a Playwright **Page**, it automatically wraps it with `page.locator('body')`.
 
 ```js
-import { newRunner } from '../src/runner';
+import { PageRunner } from '../src/runner';
 ```
 
-### 2. `AsyncRunner` — Core Class
+The constructor also accepts direct instantiation: `new PageRunner(pageOrLocator, config?)`.
+
+### 2. `PageRunner` — Core Class
 
 **Constructor parameters:**
 
@@ -112,10 +118,13 @@ import { newRunner } from '../src/runner';
 
 - **`this.pull`** — A Promise queue. Each method call appends a step via `this._then()`. Steps execute sequentially in FIFO order when `.run()` is called.
 - **`this.locatorsWay`** — A locator stack. `moveTo*` methods push, `moveBack`/`moveToInitial` pop. Used for contextual scoping.
-- **`this.page`** — Reference to the Playwright `Page` object (extracted from any Locator via `_page`).
+- **`this.page`** — Reference to the Playwright `Page` object (extracted from any Locator via `getPage()`).
+- **`this.runCallerCounter`** — Debug counter incremented per step, used in log output.
+- **`this._disabled.not` / `this._checked.not` / `this._has.not`** — Negated assertion helpers set up during `init()`.
 - **`_createMatcher()`** — Wrapper around each step: catches errors, augments them with current locator and method name context.
+- **`initNetworkListener()`** — Called in constructor; attaches `PageNetworkListener` to the page if not already present.
 
-### 3. `promiseFlow` (from [`src/tools/utils.js`](src/tools/utils.js:135))
+### 3. `promiseFlow` (from [`src/tools/utils.js`](src/tools/utils.js:124))
 
 An internal utility that executes a list of functions as a sequential Promise chain. This is the backbone of step serialization.
 
@@ -126,7 +135,7 @@ promiseFlow([fn1, fn2, fn3]);
 
 ### 4. PageNetworkListener (from [`src/tools/PageNetworkListener.js`](src/tools/PageNetworkListener.js))
 
-Auto-attached to the page in the `AsyncRunner` constructor. Intercepts network requests via `page.on('request')` / `page.on('requestfinished')` / `page.on('requestfailed')` and stores them for later inspection with `matchRequest` / `matchResponse`. Tracks `activeRequests` count in real-time.
+Auto-attached to the page in the `PageRunner` constructor via `initNetworkListener()`. Intercepts network requests via `page.on('request')` / `page.on('requestfinished')` / `page.on('requestfailed')` and stores them for later inspection with `matchRequest` / `matchResponse`. Tracks `activeRequests` count in real-time.
 
 ---
 
@@ -167,12 +176,33 @@ Auto-attached to the page in the `AsyncRunner` constructor. Intercepts network r
 | `seeText(text)` | Locator contains text | `toContainText()` |
 | `seeExactText(text)` | Locator has exact text | `toHaveText()` |
 | `enabled(selector?)` | Element is enabled | `toBeEnabled()` |
-| `disabled(selector?)` | Element is disabled | `toBeDisabled()` |
+| `disabled(selector?)` | Element is disabled | `toBeDisabled()` via `el.disabled` |
+| `checked(selector?)` | Element is checked | `el.checked` via evaluate (supports `.not`) |
 | `matchValue(selector, value, strict?)` | Check input value via `matchString` | Custom |
 | `matchStyles(selector, styles)` | Check CSS styles (`['display:flex']`) | Custom via `getComputedStyle` |
 | `matchAttr(selector, attr)` | Check attributes (`{href: '/path'}`) | Custom via `getAttribute` |
+| `has(selectors)` | Check element count; supports min/max range (supports `.not`) | Custom via `selectElements` |
 | `hasUrl(urlOrPath)` | Check current URL (supports `*`/`**` wildcards) | Custom |
 | `hasQueryParams(expectedParams, strict?)` | Check URL query params (⚠️ **unimplemented** — throws) | Custom |
+
+**`has()` usage:**
+
+```js
+// Single selector — expects exactly 1 match
+runer.has('button')
+
+// Multiple selectors
+runer.has(['button', 'input'])
+
+// With count expectations — { selector: count }
+runer.has({ button: 3 })
+
+// With range — { selector: [min, max] }
+runer.has({ 'div.error': [0, 2] })
+
+// Negation — .has.not()
+runer.has.not('.error-modal')
+```
 
 ### Screenshots
 
@@ -188,7 +218,7 @@ Auto-attached to the page in the `AsyncRunner` constructor. Intercepts network r
 |--------|-------------|
 | `waitForNavigation(selector?, timeout?)` | Wait for page navigation + optional element |
 | `waitForRequest({minCount?, timeout?})` | Wait until active requests <= minCount |
-| `listenNetwork()` | Start recording requests/responses |
+| `listenNetwork()` | Start recording requests/responses (clears previous history) |
 | `stopListenNetwork()` | Stop recording |
 | `matchRequest(url, matcher, timeout?)` | Find request by URL pattern and assert |
 | `matchResponse(url, matcher, timeout?)` | Find response by URL pattern and assert |
@@ -202,7 +232,7 @@ Auto-attached to the page in the `AsyncRunner` constructor. Intercepts network r
 | `say(text)` | `console.log` during chain execution |
 | `where()` | Log current locator |
 | `fullWay()` | Log entire locator stack |
-| `run()` | **REQUIRED**: executes the entire chain, returns `Promise<AsyncRunner>` |
+| `run()` | **REQUIRED**: executes the entire chain, returns `Promise<PageRunner>` |
 
 ### Getters
 
@@ -211,7 +241,7 @@ Auto-attached to the page in the `AsyncRunner` constructor. Intercepts network r
 | `runner.currentLocator` | Current Playwright `Locator` |
 | `runner.currentPage` | Playwright `Page` |
 | `runner.currentUrl` | `new URL(page.url())` |
-| `runner.find(selector?)` | Resolved locator (current or child) |
+| `runner.find(selector?)` | Resolved locator (current or child via `resolveLocator`) |
 
 ---
 
@@ -220,6 +250,15 @@ Auto-attached to the page in the `AsyncRunner` constructor. Intercepts network r
 File: [`src/tools/resolveLocator.js`](src/tools/resolveLocator.js)
 
 The `resolveLocator` function parses a shorthand string into Playwright locator method calls. This allows more readable selectors without calling Playwright APIs directly.
+
+### Exported functions
+
+| Function | Purpose |
+|----------|---------|
+| `resolveLocator(parent, selector)` | Resolve a shorthand selector string against a parent locator |
+| `resolveQuery(value)` | Split by `|>` and resolve each piece into an array of `[method, ...args]` |
+| `resolveQueryPiece(locatorPiece)` | Resolve a single shorthand piece |
+| `resolveText(text)` | Convert wildcard text to RegExp if contains `*` |
 
 ### Syntax Table
 
@@ -256,7 +295,7 @@ In text/role/label queries, `*` is converted to a regex (`.*`) with case-insensi
 
 | Error Class | File | When Thrown | Properties |
 |-------------|------|-------------|------------|
-| `MatcherError` | [`src/tools/MatcherError.js`](src/tools/MatcherError.js) | Any assertion failure | `message` (formatted with green/red colors) |
+| `MatcherError` | [`src/tools/MatcherError.js`](src/tools/MatcherError.js) | Any assertion failure | `message` (formatted with green/red colors), `received`, `expected` |
 | `ShotMatchError` | [`src/tools/ShotMatchError.js`](src/tools/ShotMatchError.js) | Screenshot mismatch | `diffName`, `diffResult`, `diffCount` |
 
 ### Error Enrichment
@@ -268,6 +307,14 @@ Every step in the chain wraps its execution in `_createMatcher()`. If an error o
 
 This means errors bubble up with full context, making debugging easier without manual `try/catch`.
 
+### Helper functions (from [`src/tools/makeExpectedError.js`](src/tools/makeExpectedError.js))
+
+| Function | Description |
+|----------|-------------|
+| `toRedText(text)` | Wrap text in ANSI red |
+| `toGreenText(text)` | Wrap text in ANSI green |
+| `makeExpectedError(received, expected)` | Format `Expected: green / Received: red` string |
+
 ---
 
 ## ⚙️ Configuration
@@ -278,17 +325,21 @@ This means errors bubble up with full context, making debugging easier without m
 |---------|-------|
 | `testDir` | `'./examples'` |
 | `testMatch` | `'*.uitest.js'` |
-| Timeout | 5s |
-| `waitUntil` | `'networkidle0'` |
+| Timeout (global) | 5s |
+| `waitUntil` | `'networkidle'` |
 | `preserveOutput` | `'failures-only'` |
+| `repeatEach` | 1 |
+| `fullyParallel` | `true` |
+| `forbidOnly` | `!!process.env.CI` |
+| `retries` | `process.env.CI ? 2 : 0` |
 | `headless` | `false` (default) |
 | `viewport` | `1500x1000` |
 | `timezoneId` | `'UTC'` |
 | `screenshot` | `'only-on-failure'` |
 | `trace` | `'on-first-retry'` |
 | `ignoreHTTPSErrors` | `true` |
-| Browser | chromium only |
-| Reporter | `html` (never open) + `list` (with printSteps) |
+| Browser | chromium only (via `projects`) |
+| Reporter | `html` (never open) + `list` (with `printSteps`) |
 | `expect.toHaveScreenshot.maxDiffPixels` | 10 |
 | `expect.toMatchSnapshot.maxDiffPixelRatio` | 0.1 |
 | `expect.timeout` | 5000 |
@@ -300,6 +351,23 @@ This means errors bubble up with full context, making debugging easier without m
 | `testMatch` | `'**/src/**/*.test.js'` |
 | `testEnvironment` | `'node'` |
 | `clearMocks` | `true` |
+| `coverageReporters` | `['text', 'lcov']` |
+
+### [`package.json`](package.json) — Key Scripts & Fields
+
+| Field | Value |
+|-------|-------|
+| `version` | `1.0.2` |
+| `main` | `'./dist/runner.js'` |
+| `exports` | `'.' / './runner' → './dist/runner.js'`; `'./tools/*' → './dist/tools/*'` |
+| `files` | `['dist', 'src']` |
+
+| Script | Command |
+|--------|---------|
+| `test` | `jest` |
+| `example` | `npx playwright test` |
+| `report` | `npx playwright show-report` |
+| `build` | `babel --delete-dir-on-start -d dist src --ignore **/*.test.js` |
 
 ---
 
@@ -312,44 +380,52 @@ This means errors bubble up with full context, making debugging easier without m
 | `npm test` | Jest unit tests | `src/**/*.test.js` |
 | `npm run example` | E2E tests | `examples/*.uitest.js` |
 | `npm run report` | Open Playwright HTML report | — |
+| `npm run build` | Babel transpile src → dist | `src/` (excl. `*.test.js`) |
 | `cross-env NODE_MODE=update npx playwright test` | Update reference screenshots | `examples/*.uitest.js` |
 
 > **Note:** On Windows use `cross-env NODE_MODE=update npx playwright test` or `set NODE_MODE=update && npx playwright test` for environment variables.
 
 ### Current unit tests
 
-- [`src/tools/tests/resolveLocator.test.js`](src/tools/tests/resolveLocator.test.js) — Tests for shorthand selector parsing
+- [`src/tools/tests/resolveLocator.test.js`](src/tools/tests/resolveLocator.test.js) — Tests for shorthand selector parsing (`resolveQuery`, `resolveQueryPiece`, `resolveText`)
 
 ---
 
 ## 📌 Important Caveats
 
-1. **`page.networkListener`** — This property is auto-attached to the page object by the `AsyncRunner` constructor. Do not override or manually instantiate `PageNetworkListener`.
+1. **`page.networkListener`** — This property is auto-attached to the page object by the `PageRunner` constructor. Do not override or manually instantiate `PageNetworkListener`.
 
-2. **`_getTarget` / `_getTargets`** — These internal methods use `selectElement` / `selectElements` from [`src/tools/utils.js`](src/tools/utils.js). They support:
+2. **_getTarget / _getTargets** — These internal methods use `selectElement` / `selectElements` from [`src/tools/utils.js`](src/tools/utils.js). They support:
    - XPath (prefix `/`)
    - CSS selectors
    - Arrays of `[selector, index]` for nth-element selection
 
-3. **`matchShot` behavior** — Screenshots are saved if:
+3. **_wait / _waitPromise / _waitTarget** — Internal methods for flexible waiting. `_wait` dispatches based on argument type (number → timeout, function → promise polling, string/locator → element visibility).
+
+4. **`matchShot` behavior** — Screenshots are saved if:
    - No reference file exists
    - `updateShot: true` (or `NODE_MODE=update` is set)
+   - `saveCurrent` parameter is `true`
    
    Otherwise, they are compared using `diffImages` (pixelmatch), and a `ShotMatchError` is thrown on mismatch.
 
-4. **`resolveLocator` chaining** — The `|>` separator creates a chain of locator queries. Each segment is resolved independently and applied sequentially on the parent locator.
+5. **`resolveLocator` chaining** — The `|>` separator creates a chain of locator queries. Each segment is resolved independently and applied sequentially on the parent locator.
 
-5. **`.run()` is mandatory** — Without calling `.run()` at the end of the chain, no steps execute. The chain only builds a queue of promises.
+6. **`.run()` is mandatory** — Without calling `.run()` at the end of the chain, no steps execute. The chain only builds a queue of promises.
 
-6. **All methods return `this`** — Except `.run()`, which returns `Promise<AsyncRunner>`. This enables chaining.
+7. **All methods return `this`** — Except `.run()`, which returns `Promise<PageRunner>`. This enables chaining.
 
-7. **`hasQueryParams` is unimplemented** — The method exists but throws `throw new Error('IMPLEMENT IT')`. Do not use in tests.
+8. **`hasQueryParams` is unimplemented** — The method exists but throws `throw new Error('IMPLEMENT IT')`. Do not use in tests.
 
-8. **Coding conventions:**
-   - Variables/functions: `camelCase`
-   - Classes: `PascalCase`
-   - Imports: ES modules (`import`/`export`)
-   - Linting: ESLint flat config v10 via `eslint-presets`
+9. **Negated assertion helpers** — `disabled.not`, `checked.not`, and `has.not` are set up in the `init()` method. They invert the assertion: `.checked.not(selector)` asserts the element is NOT checked, `.has.not('.error')` asserts NO matching elements exist.
+
+10. **`fillForm` uses 3x click + type** — This method triple-clicks each field (to select all text) then types the value. For array/function values, it supports dynamic value resolution per field index.
+
+11. **Coding conventions:**
+    - Variables/functions: `camelCase`
+    - Classes: `PascalCase`
+    - Imports: ES modules (`import`/`export`)
+    - Linting: ESLint flat config v10 via `eslint-presets`
 
 ---
 
@@ -360,11 +436,11 @@ This means errors bubble up with full context, making debugging easier without m
 ```js
 import { test } from '@playwright/test';
 
-import { newRunner } from '../src/runner';
+import { PageRunner } from '../src/runner';
 
 
 test('Check login and registration forms', async ({ page }) => {
-  await newRunner(page, { debug: true })
+  await PageRunner.create(page, { debug: true })
     .goto('https://zapiski.online')
     .moveToChild('.cookiesNotification')
     .seeText('Мы используем cookies для работы сервиса. Продолжая пользоваться сервисом ЗапискиОнлайн, вы принимаете')
@@ -411,11 +487,11 @@ test('Mobile and geolocation', async ({ page }) => {
 
 ```js
 import { test } from '@playwright/test';
-import { newRunner } from '../src/runner';
+import { PageRunner } from '../src/runner';
 import { screenshotTool } from '../src/tools/takeScreenshot';
 
 test('match screenshot', async ({ page }) => {
-  await newRunner(page, {
+  await PageRunner.create(page, {
     screenshotTool: screenshotTool('screenshots/my-test')
   })
     .goto('https://example.com')
@@ -427,7 +503,7 @@ test('match screenshot', async ({ page }) => {
 ### Network request/response inspection
 
 ```js
-await newRunner(page)
+await PageRunner.create(page)
   .goto('https://example.com')
   .listenNetwork()
   .click('"Отправить"')

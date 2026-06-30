@@ -21,7 +21,10 @@ module.exports = function (api) {
     ],
 
     presets: [
-      ['@babel/preset-env', { targets: { node: '22' } }],
+      ['@babel/preset-env', {
+        targets: { node: '22' },
+        modules: 'commonjs',
+      }],
       ...(additional.presets || []),
     ],
 

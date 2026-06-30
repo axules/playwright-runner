@@ -1,3 +1,9 @@
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
 class ListenedRequest {
   constructor(request) {
     this._request = request;
@@ -24,7 +30,7 @@ class ListenedRequest {
     return this._request === request;
   }
 }
-export default class PageNetworkListener {
+class PageNetworkListener {
   constructor(page) {
     this.activeRequests = 0;
     this.page = page;
@@ -83,3 +89,4 @@ export default class PageNetworkListener {
     });
   }
 }
+exports.default = PageNetworkListener;
