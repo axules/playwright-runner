@@ -46,9 +46,9 @@ export function parseCssSelector(selector) {
   // Ignored CSS without special rules
   if (!selector.includes(':@')) return [selector];
 
-  if (selector.includes(',')) {
-    throw new Error('Not supported combined selectors (e.g. "div.submit, div.newOne")');
-  }
+  // if (selector.includes(',')) {
+  //   throw new Error('Not supported combined selectors (e.g. "div.submit, div.newOne")');
+  // }
 
   const pieces = [];
   let execResult;

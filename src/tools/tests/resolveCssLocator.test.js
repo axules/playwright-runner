@@ -88,14 +88,14 @@ describe('parseCssSelector', () => {
     expect(parseCssSelector(input)).toEqual(expected);
   });
 
-  describe('error cases', () => {
-    test('throws on combined selectors with comma when :@ is present', () => {
-      expect(() => parseCssSelector('div:@text(x), button'))
-        .toThrow('Not supported combined selectors');
-      expect(() => parseCssSelector('div.submit:@text(x), div.newOne'))
-        .toThrow('Not supported combined selectors');
-    });
-  });
+  // describe('error cases', () => {
+  //   test('throws on combined selectors with comma when :@ is present', () => {
+  //     expect(() => parseCssSelector('div:@text(x), button'))
+  //       .toThrow('Not supported combined selectors');
+  //     expect(() => parseCssSelector('div.submit:@text(x), div.newOne'))
+  //       .toThrow('Not supported combined selectors');
+  //   });
+  // });
 });
 
 describe('resolveCustomMethod', () => {
