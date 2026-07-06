@@ -16,6 +16,7 @@ test('Check login and registration forms', async ({ page }) => {
     .seeText('Войти')
     .click('li:@text(Регистрация)')
     .seeText('Повторите пароль')
-    .fullWay()
+    .where()
+    .fullPath()
     .run();
 });

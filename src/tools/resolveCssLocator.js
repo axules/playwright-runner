@@ -151,7 +151,7 @@ export function resolveCssQuery(value) {
  *   - `:@placeholder(any text)` — match by placeholder attribute
  *   - `*:@text(Submit)` — filter within the current element by text
  *
- * @param {import('playwright').Locator} parent - The parent Playwright Locator
+ * @param {import('playwright').Locator|import('playwright').Page} parent - The parent Playwright Locator
  *   to resolve the selector against.
  * @param {string|Array<string>|import('playwright').Locator} selector -
  *   A CSS selector string (possibly with `:@method(arg)` directives), an array of

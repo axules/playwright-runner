@@ -452,7 +452,7 @@ test('Check login and registration forms', async ({page}) => {
     .seeText('Войти')
     .click('"Регистрация"')
     .seeText('Повторите пароль')
-    .fullWay()
+    .fullPath()
     .run();
 });
 ```

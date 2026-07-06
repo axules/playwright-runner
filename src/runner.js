@@ -76,7 +76,7 @@ export class PageRunner {
     if (!initialLocator) {
       throw new Error('Initial locator should be defined');
     }
-    const locator = isPage(initialLocator) ? initialLocator.locator('body') : initialLocator;
+    const locator = isPage(initialLocator) ? initialLocator.locator('html') : initialLocator;
 
     this.init = () => {
       const {
@@ -185,7 +185,7 @@ export class PageRunner {
   /**
    * Use to get current Playwright Page
    *
-   * @returns {playwright.Page}
+   * @returns {import("playwright").Page}
    */
   get currentPage() {
     return this._page;
@@ -193,6 +193,10 @@ export class PageRunner {
 
   get currentUrl() {
     return new URL(this.currentPage.url());
+  }
+
+  resolveLocator(locator) {
+    return resolveCssLocator(this.currentPage, locator);
   }
 
   /**
@@ -364,20 +368,20 @@ export class PageRunner {
 
   within(selector) {
     return this._then(this.within, async () => {
-      this.locatorsWay.push(this.currentPage.locator(selector));
+      this.locatorsWay.push(this.resolveLocator(selector));
     });
   }
 
   withinBody() {
     return this._then(this.withinBody, async () => {
-      this.locatorsWay.push(this.currentPage.locator('body'));
+      this.locatorsWay.push(this.resolveLocator('body'));
     });
   }
 
   withinChild(selector) {
     return this._then(this.withinChild, async () => {
       this.log(this.currentLocator, '->', selector);
-      this.locatorsWay.push(this.currentLocator.locator(selector));
+      this.locatorsWay.push(this.find(selector));
     });
   }
 
@@ -394,10 +398,10 @@ export class PageRunner {
     });
   }
 
-  fullWay() {
-    return this._then(this.fullWay, async () => {
+  fullPath() {
+    return this._then(this.fullPath, async () => {
       // eslint-disable-next-line no-console
-      console.log('I was here: ', this.locatorsWay.join(' -->> '));
+      console.log(`I was here:\n${this.locatorsWay.join('\n')}`);
     });
   }
 

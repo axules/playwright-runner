@@ -56,7 +56,7 @@ class PageRunner {
     if (!initialLocator) {
       throw new Error('Initial locator should be defined');
     }
-    const locator = (0, _utils.isPage)(initialLocator) ? initialLocator.locator('body') : initialLocator;
+    const locator = (0, _utils.isPage)(initialLocator) ? initialLocator.locator('html') : initialLocator;
     this.init = () => {
       const {
         debug = false,
@@ -145,13 +145,16 @@ class PageRunner {
   /**
    * Use to get current Playwright Page
    *
-   * @returns {playwright.Page}
+   * @returns {import("playwright").Page}
    */
   get currentPage() {
     return this._page;
   }
   get currentUrl() {
     return new URL(this.currentPage.url());
+  }
+  resolveLocator(locator) {
+    return (0, _resolveCssLocator.resolveCssLocator)(this.currentPage, locator);
   }
 
   /**
@@ -306,18 +309,18 @@ class PageRunner {
   }
   within(selector) {
     return this._then(this.within, async () => {
-      this.locatorsWay.push(this.currentPage.locator(selector));
+      this.locatorsWay.push(this.resolveLocator(selector));
     });
   }
   withinBody() {
     return this._then(this.withinBody, async () => {
-      this.locatorsWay.push(this.currentPage.locator('body'));
+      this.locatorsWay.push(this.resolveLocator('body'));
     });
   }
   withinChild(selector) {
     return this._then(this.withinChild, async () => {
       this.log(this.currentLocator, '->', selector);
-      this.locatorsWay.push(this.currentLocator.locator(selector));
+      this.locatorsWay.push(this.find(selector));
     });
   }
   withinInitial() {
@@ -331,10 +334,10 @@ class PageRunner {
       console.log('I am here: ', this.currentLocator);
     });
   }
-  fullWay() {
-    return this._then(this.fullWay, async () => {
+  fullPath() {
+    return this._then(this.fullPath, async () => {
       // eslint-disable-next-line no-console
-      console.log('I was here: ', this.locatorsWay.join(' -->> '));
+      console.log(`I was here:\n${this.locatorsWay.join('\n')}`);
     });
   }
   seeElement(selector = undefined) {
