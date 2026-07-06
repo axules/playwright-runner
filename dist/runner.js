@@ -91,15 +91,15 @@ class PageRunner {
       //   global.expect.getState().assertionCalls += 1;
       // }
       try {
-        this.log(`Action ${counter}:`, caller.name, 'with args', args);
+        this.log(`Action ${counter}:`, caller.name);
         return await action(...args);
       } catch (error) {
-        this.log(`Action ${counter}:`, caller.name, 'failed');
+        this.log(`Action ${counter} [`, caller.name, '] failed');
         error.stack = initError.stack;
         error.message = ['', `Method: ${initError.message}`, `Current locator: ${this.currentLocator}`, 'Message:', error.message, error.stack].join('\n');
         throw error;
       } finally {
-        this.log(`Action ${counter}:`, caller.name, 'finished');
+        this.log(`Action ${counter} [`, caller.name, '] finished');
       }
     };
   }
@@ -544,8 +544,7 @@ class PageRunner {
   }
   goto(url, waitForSelector = undefined, options = undefined) {
     return this._then(this.goto, async () => {
-      const fullUrl = (/^https?:\/\//i.test(url) ? '' : this.currentUrl.origin) + url;
-      await this.currentPage.goto(fullUrl, {
+      await this.currentPage.goto(url, {
         waitUntil: 'load',
         ...options
       });

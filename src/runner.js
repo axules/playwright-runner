@@ -122,10 +122,10 @@ export class PageRunner {
       //   global.expect.getState().assertionCalls += 1;
       // }
       try {
-        this.log(`Action ${counter}:`, caller.name, 'with args', args);
+        this.log(`Action ${counter}:`, caller.name);
         return await action(...args);
       } catch (error) {
-        this.log(`Action ${counter}:`, caller.name, 'failed');
+        this.log(`Action ${counter} [`, caller.name, '] failed');
         error.stack = initError.stack;
         error.message = [
           '',
@@ -137,7 +137,7 @@ export class PageRunner {
         ].join('\n');
         throw error;
       } finally {
-        this.log(`Action ${counter}:`, caller.name, 'finished');
+        this.log(`Action ${counter} [`, caller.name, '] finished');
       }
     };
   }
@@ -633,8 +633,7 @@ export class PageRunner {
 
   goto(url, waitForSelector = undefined, options = undefined) {
     return this._then(this.goto, async () => {
-      const fullUrl = (/^https?:\/\//i.test(url) ? '' : this.currentUrl.origin) + url;
-      await this.currentPage.goto(fullUrl, { waitUntil: 'load', ...options });
+      await this.currentPage.goto(url, { waitUntil: 'load', ...options });
       if (waitForSelector) {
         await expect(this.currentPage.locator(waitForSelector)).toBeVisible();
       }
