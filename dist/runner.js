@@ -13,6 +13,7 @@ var _PageNetworkListener = _interopRequireDefault(require("./tools/PageNetworkLi
 var _ShotMatchError = _interopRequireDefault(require("./tools/ShotMatchError"));
 var _utils = require("./tools/utils");
 var _resolveCssLocator = require("./tools/resolveCssLocator");
+var _lodash = _interopRequireDefault(require("lodash.isstring"));
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
 function expectToBeDefined(name, received) {
   if (typeof received === 'undefined') {
@@ -291,11 +292,11 @@ class PageRunner {
     });
     return this;
   }
-  moveBack(stepsNumber = 1) {
-    return this._then(this.moveBack, async () => {
+  withinBack(stepsNumber = 1) {
+    return this._then(this.withinBack, async () => {
       if (stepsNumber >= this.locatorsWay.length) {
         if (this.locatorsWay.length > 1) {
-          console.warn('moveBack :: not enough steps');
+          console.warn('withinBack :: not enough steps');
         }
         this.locatorsWay = this.locatorsWay.slice(0, 1);
       } else {
@@ -303,24 +304,24 @@ class PageRunner {
       }
     });
   }
-  moveTo(selector) {
-    return this._then(this.moveTo, async () => {
+  within(selector) {
+    return this._then(this.within, async () => {
       this.locatorsWay.push(this.currentPage.locator(selector));
     });
   }
-  moveToBody() {
-    return this._then(this.moveToBody, async () => {
+  withinBody() {
+    return this._then(this.withinBody, async () => {
       this.locatorsWay.push(this.currentPage.locator('body'));
     });
   }
-  moveToChild(selector) {
-    return this._then(this.moveToChild, async () => {
+  withinChild(selector) {
+    return this._then(this.withinChild, async () => {
       this.log(this.currentLocator, '->', selector);
       this.locatorsWay.push(this.currentLocator.locator(selector));
     });
   }
-  moveToInitial() {
-    return this._then(this.moveToInitial, async () => {
+  withinInitial() {
+    return this._then(this.withinInitial, async () => {
       this.locatorsWay = this.locatorsWay.slice(0, 1);
     });
   }
@@ -351,65 +352,73 @@ class PageRunner {
       await (0, _test.expect)(this.find(selector)).toHaveCount(count);
     });
   }
-  enabled(selector = null) {
+  enabled(selector = undefined) {
     return this._then(this.enabled, async () => {
-      const target = await this._waitForTarget(selector);
-      await this._disabled.not(target);
-      // await target.dispose();
+      await (0, _test.expect)(this.find(selector)).toBeEnabled();
     });
   }
-  disabled(selector = null) {
+  disabled(selector = undefined) {
     return this._then(this.disabled, async () => {
-      const target = await this._waitForTarget(selector);
-      await this._disabled(target);
-      // await target.dispose();
+      await (0, _test.expect)(this.find(selector)).toBeDisabled();
     });
   }
-  matchStyles(selector, styles) {
+  visible(selector = undefined) {
+    return this._then(this.visible, async () => {
+      await (0, _test.expect)(this.find(selector)).toBeVisible();
+    });
+  }
+  hidden(selector = undefined) {
+    return this._then(this.hidden, async () => {
+      await (0, _test.expect)(this.find(selector)).toBeHidden();
+    });
+  }
+  matchStyles(styles, selector = undefined) {
     return this._then(this.matchStyles, async () => {
-      const target = await this._waitForTarget(selector);
-      const expectedCss = styles.map(el => el.split(':')).reduce((R, [k, v]) => Object.assign(R, {
-        [k.trim()]: v.trim()
-      }), {});
-      const currentCss = await (0, _utils.getStyles)(target, Object.keys(expectedCss));
-      const result = Object.entries(expectedCss).reduce((R, [key, expected]) => {
-        const current = currentCss[key];
-        if (expected instanceof RegExp ? !current.match(expected) : current != expected) {
-          R.push([key, current, expected]);
-        }
-        return R;
-      }, []);
-      if (result.length > 0) {
-        const received = [];
-        const expected = [];
-        result.forEach(([k, r, e], i) => {
-          received.push(`${i + 1}. ${k}: ${r};`);
-          expected.push(`${i + 1}. ${k}: ${e};`);
-        });
-        expectToBe(`${selector} Styles:`, received.join('\n'), expected.join('\n'));
-      }
+      const target = this.find(selector);
+      await (0, _utils.promiseFlow)(Object.entries(styles).map(([key, value]) => (0, _test.expect)(target).toHaveCSS(key, value)));
+      // const expectedCss = styles.map(el => el.split(':')).reduce((R, [k, v]) => Object.assign(R, { [k.trim()]: v.trim() }), {});
+      // const currentCss = await getStyles(target, Object.keys(expectedCss));
+      // const result = Object.entries(expectedCss)
+      //   .reduce((R, [key, expected]) => {
+      //     const current = currentCss[key];
+      //     if (expected instanceof RegExp ? !current.match(expected) : current != expected) {
+      //       R.push([key, current, expected]);
+      //     }
+      //     return R;
+      //   }, []);
+      // if (result.length > 0) {
+      //   const received = [];
+      //   const expected = [];
+      //   result.forEach(([k, r, e], i) => {
+      //     received.push(`${i + 1}. ${k}: ${r};`);
+      //     expected.push(`${i + 1}. ${k}: ${e};`);
+      //   });
+      //   expectToBe(`${selector} Styles:`, received.join('\n'), expected.join('\n'));
+      // }
     });
   }
-  matchAttr(selector, attr) {
+  matchAttr(attr, selector = undefined) {
     return this._then(this.matchAttr, async () => {
-      const target = await this._waitForTarget(selector);
-      const currentAttr = await (0, _utils.getAttributes)(target, Object.keys(attr));
-      const result = Object.entries(attr).reduce((R, [key, expected]) => {
-        const current = currentAttr[key];
-        if (expected instanceof RegExp ? !current.match(expected) : current != expected) {
-          R.push([key, current, expected]);
-        }
-        return R;
-      }, []);
-      if (result.length > 0) {
-        const received = [];
-        const expected = [];
-        result.forEach(([k, r, e], i) => {
-          received.push(`${i + 1}. ${k}=${r}`);
-          expected.push(`${i + 1}. ${k}=${e}`);
-        });
-        expectToBe(`${selector} Attributes:`, received.join('\n'), expected.join('\n'));
-      }
+      const target = this.find(selector);
+      await (0, _utils.promiseFlow)(Object.entries(attr).map(([key, value]) => (0, _test.expect)(target).toHaveAttribute(key, value)));
+      // const currentAttr = await getAttributes(target, Object.keys(attr));
+      // const result = Object.entries(attr)
+      //   .reduce((R, [key, expected]) => {
+      //     const current = currentAttr[key];
+      //     if (expected instanceof RegExp ? !current.match(expected) : current != expected) {
+      //       R.push([key, current, expected]);
+      //     }
+      //     return R;
+      //   }, []);
+      // if (result.length > 0) {
+      //   const received = [];
+      //   const expected = [];
+      //   result.forEach(([k, r, e], i) => {
+      //     received.push(`${i + 1}. ${k}=${r}`);
+      //     expected.push(`${i + 1}. ${k}=${e}`);
+      //   });
+      //   expectToBe(`${selector} Attributes:`, received.join('\n'), expected.join('\n'));
+      // }
     });
   }
   click(selector = undefined, options = undefined) {
@@ -419,9 +428,7 @@ class PageRunner {
   }
   fill(selector, text, options = undefined) {
     return this._then(this.fill, async () => {
-      const locator = this.find(selector);
-      await (0, _test.expect)(locator).toBeEnabled();
-      await locator.fill(text, options);
+      await this.find(selector).fill(text, options);
     });
   }
   fillForm(data, parent) {
@@ -430,9 +437,6 @@ class PageRunner {
       await (0, _utils.promiseFlow)(Object.entries(data).map(([name, value]) => async () => {
         const inputSelector = `[name="${name}"]`;
         const field = await form.locator(inputSelector);
-        if (!field) {
-          expectToBe(`${inputSelector} should be found in ${parent}`, fields.length, ' > 0');
-        }
         if (value) {
           await field.fill(String(value));
         } else {
@@ -480,20 +484,20 @@ class PageRunner {
       await (0, _test.expect)(this.find(element)).toHaveText(text);
     });
   }
-  matchValue(field, value, strict = false) {
+  matchValue(field, value) {
     return this._then(this.matchValue, async () => {
-      const target = await this.find(field);
-      const targetValue = await target.evaluate(el => el.value);
-      if (!(0, _utils.matchString)(targetValue, value, strict)) {
-        expectToBe(field, targetValue, strict ? value : `contains '${value}'`);
-      }
+      await (0, _test.expect)(this.find(field)).toHaveValue(value);
+      // const targetValue = await target.evaluate(el => el.value);
+      // if (!matchString(targetValue, value, strict)) {
+      //   expectToBe(field, targetValue, strict ? value : `contains '${value}'`);
+      // }
     });
   }
   hasUrl(urlOrPath) {
     return this._then(this.hasUrl, async () => {
-      if (urlOrPath.startsWith('*/')) {
+      if ((0, _lodash.default)(urlOrPath) && urlOrPath.startsWith('*/')) {
         await (0, _test.expect)(this.currentPage).toHaveURL(this.currentUrl.origin + urlOrPath.slice(1));
-      } else if (urlOrPath.startsWith('**/')) {
+      } else if ((0, _lodash.default)(urlOrPath) && urlOrPath.startsWith('**/')) {
         await (0, _test.expect)(this.currentPage).toHaveURL(new RegExp(`.+${urlOrPath.slice(2)}`));
       } else {
         await (0, _test.expect)(this.currentPage).toHaveURL(urlOrPath);
@@ -508,17 +512,24 @@ class PageRunner {
       // }
     });
   }
-  hasQueryParams(expectedParams, strict = false) {
+  hasQueryParams(expectedParams) {
     return this._then(this.hasQueryParams, async () => {
-      throw new Error('IMPLEMENT IT');
-      let result = [];
-      await this._waitPromise(() => {
-        const currentParams = (0, _utils.resolveUrlSearchParams)(Array.from(this.currentUrl.searchParams));
-        result = (0, _utils.matchObject)(currentParams, expectedParams, strict).map(([k, r, e]) => [`${k}=${r}`, `${k}=${e}`]);
-        return result.length <= 0;
-      });
-      if (result.length) {
-        expectToBe(new URL(this.currentPage.url()).search, result.map(el => el[0]).join(',\n'), result.map(el => el[1]).join(',\n'));
+      const errors = [];
+      try {
+        await (0, _test.expect)(this.currentPage).toHaveURL(url => {
+          const params = url.searchParams;
+          Object.entries(expectedParams).forEach(([key, val]) => {
+            if (String(params[key]) !== String(val)) {
+              errors.push(`Param: ${key};\nExpected: ${val};\nActual: ${val}`);
+            }
+          }, []);
+          return errors.length === 0;
+        });
+      } catch (e) {
+        console.error(e.message);
+        const error = new Error(errors.join('\n'));
+        error.cause = e;
+        throw error;
       }
     });
   }
@@ -622,6 +633,7 @@ class PageRunner {
         returnBuffer: !save
       });
       if (save) {
+        // eslint-disable-next-line no-console
         console.log('Save shot: ', current);
       } else {
         const {
