@@ -65,8 +65,8 @@ class PageRunner {
       } = options;
       this.runCallerCounter = 0;
       this.locatorsWay = [locator];
-      this.page = (0, _utils.getPage)(locator);
-      initNetworkListener(this.page);
+      this._page = (0, _utils.getPage)(locator);
+      initNetworkListener(this._page);
       this.targetTimeout = targetTimeout;
       this.updateShot = updateShot;
       this.screenshotTool = screenshotTool;
@@ -104,11 +104,16 @@ class PageRunner {
   }
 
   /**
+   * Добавляет шаг в очередь выполнения (this.pull).
+   * Оборачивает nextAction в matcher для обработки ошибок и логирования.
+   * Возвращает this для поддержки цепочечного вызова (fluent API).
    *
-   * @param caller
-   * @param nextAction
-   * @returns {PageRunner}
-   * @private
+   * @param {Function} caller - Ссылка на вызывающий метод (используется для
+   *   генерации контекста ошибки и логирования имени шага).
+   * @param {Function} nextAction - Асинхронная функция, реализующая логику шага.
+   * @returns {this} Экземпляр PageRunner для chaining.
+   * @throws {Error} Если caller не передан (undefined).
+   * @protected
    */
   _then(caller, nextAction) {
     if (!caller) throw new Error('Caller is undefined!');
@@ -130,7 +135,7 @@ class PageRunner {
   /**
    * Use to get current Playwright Locator
    *
-   * @returns {Locator}
+   * @returns {import("playwright").Locator}
    */
   get currentLocator() {
     return this.locatorsWay[this.locatorsWay.length - 1];
@@ -142,7 +147,7 @@ class PageRunner {
    * @returns {playwright.Page}
    */
   get currentPage() {
-    return this.page;
+    return this._page;
   }
   get currentUrl() {
     return new URL(this.currentPage.url());
@@ -151,8 +156,8 @@ class PageRunner {
   /**
    * Find children locator or current if selector is empty
    *
-   * @arg {Locator|String?} locatorOrSelector
-   * @returns {Locator}
+   * @arg {import("playwright").Locator|String?} locatorOrSelector
+   * @returns {import("playwright").Locator}
    */
   find(locatorOrSelector = undefined) {
     return locatorOrSelector ? (0, _resolveCssLocator.resolveCssLocator)(this.currentLocator, locatorOrSelector) : this.currentLocator;
@@ -202,12 +207,12 @@ class PageRunner {
       case 'function':
         return this._waitPromise(any, options);
       case 'string':
-        return this._waitTarget(any, options);
+        return this._waitForTarget(any, options);
       default:
         if (any.then && any.reject) {
           return this._waitPromise(any, options);
         } else {
-          return this._waitTarget(any, options);
+          return this._waitForTarget(any, options);
         }
     }
   }
@@ -224,7 +229,7 @@ class PageRunner {
     }
     return waited <= timeout;
   }
-  async _waitTarget(locatorOrSelector, options = {}) {
+  async _waitForTarget(locatorOrSelector, options = {}) {
     let element = undefined;
     await this._waitPromise(async () => {
       element = await this._getTarget(locatorOrSelector);
@@ -262,7 +267,7 @@ class PageRunner {
     this._then(this.waitForNavigation, async () => {
       await this._waitForNavigation();
       if (selector) {
-        await this._waitTarget(selector, {
+        await this._waitForTarget(selector, {
           timeout
         });
       }
@@ -331,33 +336,38 @@ class PageRunner {
       console.log('I was here: ', this.locatorsWay.join(' -->> '));
     });
   }
-  see(selector = null) {
-    return this._then(this.see, async () => {
+  seeElement(selector = undefined) {
+    return this._then(this.seeElement, async () => {
       await (0, _test.expect)(this.find(selector)).toBeVisible();
     });
   }
-  dontSee(selector = undefined) {
-    return this._then(this.dontSee, async () => {
+  dontSeeElement(selector = undefined) {
+    return this._then(this.dontSeeElement, async () => {
       await (0, _test.expect)(this.find(selector)).toBeHidden();
+    });
+  }
+  seeElementsNumber(count, selector = undefined) {
+    return this._then(this.seeElementsNumber, async () => {
+      await (0, _test.expect)(this.find(selector)).toHaveCount(count);
     });
   }
   enabled(selector = null) {
     return this._then(this.enabled, async () => {
-      const target = await this._waitTarget(selector);
+      const target = await this._waitForTarget(selector);
       await this._disabled.not(target);
       // await target.dispose();
     });
   }
   disabled(selector = null) {
     return this._then(this.disabled, async () => {
-      const target = await this._waitTarget(selector);
+      const target = await this._waitForTarget(selector);
       await this._disabled(target);
       // await target.dispose();
     });
   }
   matchStyles(selector, styles) {
     return this._then(this.matchStyles, async () => {
-      const target = await this._waitTarget(selector);
+      const target = await this._waitForTarget(selector);
       const expectedCss = styles.map(el => el.split(':')).reduce((R, [k, v]) => Object.assign(R, {
         [k.trim()]: v.trim()
       }), {});
@@ -382,7 +392,7 @@ class PageRunner {
   }
   matchAttr(selector, attr) {
     return this._then(this.matchAttr, async () => {
-      const target = await this._waitTarget(selector);
+      const target = await this._waitForTarget(selector);
       const currentAttr = await (0, _utils.getAttributes)(target, Object.keys(attr));
       const result = Object.entries(attr).reduce((R, [key, expected]) => {
         const current = currentAttr[key];
@@ -404,9 +414,7 @@ class PageRunner {
   }
   click(selector = undefined, options = undefined) {
     return this._then(this.click, async () => {
-      const locator = this.find(selector);
-      await (0, _test.expect)(locator).toBeEnabled();
-      await locator.click(options);
+      await this.find(selector).click(options);
     });
   }
   fill(selector, text, options = undefined) {
@@ -416,49 +424,68 @@ class PageRunner {
       await locator.fill(text, options);
     });
   }
-  fillForm(selector, data) {
+  fillForm(data, parent) {
     return this._then(this.fillForm, async () => {
-      const form = await this._waitTarget(selector);
-      await this._disabled.not(form);
+      const form = this.find(parent);
       await (0, _utils.promiseFlow)(Object.entries(data).map(([name, value]) => async () => {
         const inputSelector = `[name="${name}"]`;
-        const fields = Array.from(await (0, _utils.selectElements)(form, inputSelector));
-        if (fields.length === 0) {
-          expectToBe(`${inputSelector} should be found in ${selector}`, fields.length, ' > 0');
+        const field = await form.locator(inputSelector);
+        if (!field) {
+          expectToBe(`${inputSelector} should be found in ${parent}`, fields.length, ' > 0');
         }
-        return (0, _utils.promiseFlow)(fields.map((field, i) => async () => {
-          await field.click({
-            clickCount: 3
-          });
-          const fieldValue = value?.then && value?.reject || typeof value === 'function' ? await value(name, i, field) : value;
-          await field.type(String(fieldValue));
-        }));
+        if (value) {
+          await field.fill(String(value));
+        } else {
+          await field.clear();
+        }
       }));
     });
   }
-  press(selector, button, options) {
-    return this._then(this.press, async () => {
-      const target = await this._waitTarget(selector, options);
-      await this._disabled.not(target);
-      await (0, _utils.promiseFlow)((Array.isArray(button) ? button : [button]).map(el => () => target.press(el)));
+  pressKey(key, element = undefined) {
+    return this._then(this.pressKey, async () => {
+      const target = element && this.find(element);
+      const {
+        keyboard
+      } = this.currentPage;
+      await (0, _utils.promiseFlow)((Array.isArray(key) ? key : [key]).map(el => (target || keyboard).press(el)));
     });
   }
-  seeText(text) {
+  pressEnter(element = undefined) {
+    return this._then(this.pressKey, async () => {
+      this.pressKey('Enter', element);
+    });
+  }
+  pressEsc(element = undefined) {
+    return this._then(this.pressKey, async () => {
+      this.pressKey('Escape', element);
+    });
+  }
+  pressTab(element = undefined) {
+    return this._then(this.pressKey, async () => {
+      this.pressKey('Tab', element);
+    });
+  }
+  pressSpace(element = undefined) {
+    return this._then(this.pressKey, async () => {
+      this.pressKey('Space', element);
+    });
+  }
+  seeText(text, element = undefined) {
     return this._then(this.seeText, async () => {
-      await (0, _test.expect)(this.currentLocator).toContainText(text);
+      await (0, _test.expect)(this.find(element)).toContainText(text);
     });
   }
-  seeExactText(text) {
+  seeExactText(text, element = undefined) {
     return this._then(this.seeExactText, async () => {
-      await (0, _test.expect)(this.currentLocator).toHaveText(text);
+      await (0, _test.expect)(this.find(element)).toHaveText(text);
     });
   }
-  matchValue(selector, value, strict = false) {
+  matchValue(field, value, strict = false) {
     return this._then(this.matchValue, async () => {
-      const target = await this._waitTarget(selector);
+      const target = await this.find(field);
       const targetValue = await target.evaluate(el => el.value);
       if (!(0, _utils.matchString)(targetValue, value, strict)) {
-        expectToBe(selector, targetValue, strict ? value : `contains '${value}'`);
+        expectToBe(field, targetValue, strict ? value : `contains '${value}'`);
       }
     });
   }
@@ -564,7 +591,7 @@ class PageRunner {
     return this._then(this.saveShot, async () => {
       let target = this.currentLocator;
       if (selector) {
-        target = await this._waitTarget(selector);
+        target = await this._waitForTarget(selector);
       }
       expectToBeDefined(selector, target);
       await this.screenshotTool(target, name);
@@ -583,7 +610,7 @@ class PageRunner {
     return this._then(this.matchShot, async () => {
       let target = this.currentLocator;
       if (selector) {
-        target = await this._waitTarget(selector);
+        target = await this._waitForTarget(selector);
       }
       expectToBeDefined(selector, target);
       const fullName = this.screenshotTool?.getFullName(name);

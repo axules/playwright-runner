@@ -434,21 +434,21 @@ This means errors bubble up with full context, making debugging easier without m
 ### Basic test with assertions ([`examples/zapiski.uitest.js`](examples/zapiski.uitest.js))
 
 ```js
-import { test } from '@playwright/test';
+import {test} from '@playwright/test';
 
-import { PageRunner } from '../src/runner';
+import {PageRunner} from '../src/runner';
 
 
-test('Check login and registration forms', async ({ page }) => {
-  await PageRunner.create(page, { debug: true })
+test('Check login and registration forms', async ({page}) => {
+  await PageRunner.create(page, {debug: true})
     .goto('https://zapiski.online')
-    .moveToChild('.cookiesNotification')
+    .withinChild('.cookiesNotification')
     .seeText('Мы используем cookies для работы сервиса. Продолжая пользоваться сервисом ЗапискиОнлайн, вы принимаете')
     .click('button')
     .dontSee()
     .reloadPage()
     .dontSee()
-    .moveTo('#login_frame')
+    .within('#login_frame')
     .seeText('Войти')
     .click('"Регистрация"')
     .seeText('Повторите пароль')
