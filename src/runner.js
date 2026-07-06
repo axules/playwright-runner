@@ -524,35 +524,39 @@ export class PageRunner {
     });
   }
 
+  async _pressKey(key, element = undefined) {
+    const target = element && this.find(element);
+    const { keyboard } = this.currentPage;
+    await promiseFlow((Array.isArray(key) ? key : [key]).map((el) => (target || keyboard).press(el)));
+  }
+
   pressKey(key, element = undefined) {
     return this._then(this.pressKey, async () => {
-      const target = element && this.find(element);
-      const { keyboard } = this.currentPage;
-      await promiseFlow((Array.isArray(key) ? key : [key]).map((el) => (target || keyboard).press(el)));
+      await this._pressKey(key, element);
     });
   }
 
   pressEnter(element = undefined) {
     return this._then(this.pressKey, async () => {
-      this.pressKey('Enter', element);
+      await this._pressKey('Enter', element);
     });
   }
 
   pressEsc(element = undefined) {
     return this._then(this.pressKey, async () => {
-      this.pressKey('Escape', element);
+      await this._pressKey('Escape', element);
     });
   }
 
   pressTab(element = undefined) {
     return this._then(this.pressKey, async () => {
-      this.pressKey('Tab', element);
+      await this._pressKey('Tab', element);
     });
   }
 
   pressSpace(element = undefined) {
     return this._then(this.pressKey, async () => {
-      this.pressKey('Space', element);
+      await this._pressKey('Space', element);
     });
   }
 
@@ -627,23 +631,22 @@ export class PageRunner {
     });
   }
 
-  goto(url, waitForSelector = undefined, timeout = undefined) {
+  goto(url, waitForSelector = undefined, options = undefined) {
     return this._then(this.goto, async () => {
-      const { currentPage } = this;
       const fullUrl = (/^https?:\/\//i.test(url) ? '' : this.currentUrl.origin) + url;
-      await currentPage.goto(fullUrl, { timeout, waitUntil: 'networkidle0' });
+      await this.currentPage.goto(fullUrl, { waitUntil: 'load', ...options });
       if (waitForSelector) {
-        await expect(currentPage.locator(waitForSelector)).toBeVisible();
+        await expect(this.currentPage.locator(waitForSelector)).toBeVisible();
       }
     });
   }
 
-  reloadPage(waitForLocator = null, timeout = 5000) {
+  reloadPage(waitForSelector = null, options = undefined) {
     return this._then(this.reloadPage, async () => {
       const { currentPage } = this;
-      await currentPage.reload({ timeout, waitUntil: 'networkidle0' });
-      if (waitForLocator) {
-        await expect(currentPage.locator(waitForLocator)).toBeVisible();
+      await currentPage.reload({ waitUntil: 'load', ...options });
+      if (waitForSelector) {
+        await expect(currentPage.locator(waitForSelector)).toBeVisible();
       }
     });
   }

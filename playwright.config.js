@@ -17,7 +17,7 @@ import {
  */
 export default defineConfig({
   timeout: 5_000,
-  waitUntil: 'networkidle',
+  waitUntil: 'load',
   preserveOutput: 'failures-only',
   testDir: './examples',
   testMatch: '*.uitest.js',
