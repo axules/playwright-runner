@@ -71,7 +71,7 @@ export function isPage(element) {
 export function getPage(element) {
   if (!element) return null;
   if (isPage(element)) return element;
-  return element._page || element?._frame?._page;
+  return (element.page && element.page()) || element._page || element?._frame?._page;
   // const frame = await(await element.executionContext()).frame();
   // return frame?._frameManager?._page || frame;
 }

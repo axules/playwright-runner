@@ -89,7 +89,7 @@ export class PageRunner {
       this.runCallerCounter = 0;
       this.locatorsWay = [locator];
       this._page = getPage(locator);
-      initNetworkListener(this._page);
+      // initNetworkListener(this._page);
 
       this.targetTimeout = targetTimeout;
       this.updateShot = updateShot;
@@ -105,10 +105,6 @@ export class PageRunner {
           ...args,
         );
       }
-
-      this._disabled.not = (selector) => this._disabled(selector, true);
-      this._checked.not = (selector) => this._checked(selector, true);
-      this._has.not = (selectors) => this._has(selectors, true);
     };
 
     this.init();
@@ -188,6 +184,7 @@ export class PageRunner {
    * @returns {import("playwright").Page}
    */
   get currentPage() {
+    this._page = this._page || getPage(this.currentLocator);
     return this._page;
   }
 
@@ -209,10 +206,6 @@ export class PageRunner {
     return locatorOrSelector ? resolveCssLocator(this.currentLocator, locatorOrSelector) : this.currentLocator;
   }
 
-  _waitForNavigation(options) {
-    return this.currentPage.waitForNavigation(options);
-  }
-
   _getTarget(selectors) {
     const isBody = typeof (selectors) === 'string' && /^body/i.test(selectors);
     return selectElement(isBody ? this.currentPage : this.currentLocator, selectors);
@@ -221,44 +214,6 @@ export class PageRunner {
   _getTargets(selectors) {
     const isBody = typeof (selectors) === 'string' && /^body/i.test(selectors);
     return selectElements(isBody ? this.currentPage : this.currentLocator, selectors);
-  }
-
-  async _disabled(selector, not = false) {
-    const target = await this._getTarget(selector);
-    expectToBeDefined(selector, target);
-    const value = await target._page.evaluate(el => el.disabled, target);
-    expectToBe('disabled', value || false, !not);
-  }
-
-  async _checked(selector, not = false) {
-    const target = await this._getTarget(selector);
-    expectToBeDefined(selector, target);
-    const value = await target._page.evaluate(el => el.checked, target);
-    expectToBe('checked', value, !not);
-  }
-
-  async _has(selectors, not = false) {
-    const count = not ? 0 : 1;
-    await Promise.all(
-      (Array.isArray(selectors)
-        ? selectors.map(el => (Array.isArray(el) ? [el[0], el[1], el[2]] : [el, count]))
-        : (
-          typeof (selectors) === 'string'
-            ? [[selectors, count]]
-            : Object.entries(selectors).map(([selector, value]) => {
-              const [minCount, maxCount] = Array.isArray(value) ? value : [value, undefined];
-              return [selector, minCount, maxCount];
-            })
-        )
-      ).map(async ([selector, countMin, countMax]) => {
-        const elements = await this._getTargets(selector);
-        if (countMax === undefined) {
-          expectToBe(String(selector), elements.length, countMin);
-        } else if (elements.length < countMin || elements.length > countMax) {
-          expectToBe(String(selector), elements.length, `between ${countMin} and ${countMax}`);
-        }
-      }),
-    );
   }
 
   _wait(any, options = {}) {
@@ -325,16 +280,6 @@ export class PageRunner {
     return this._then(this.waitTime, async () => {
       await this._waitTime(timeout);
     });
-  }
-
-  waitForNavigation(selector = undefined, timeout = 15000) {
-    this._then(this.waitForNavigation, async () => {
-      await this._waitForNavigation();
-      if (selector) {
-        await this._waitForTarget(selector, { timeout });
-      }
-    });
-    return this;
   }
 
   waitForRequest(options = {}) {
@@ -417,38 +362,38 @@ export class PageRunner {
     });
   }
 
-  seeElementsNumber(count, selector = undefined) {
-    return this._then(this.seeElementsNumber, async () => {
+  expectElementsNumber(count, selector = undefined) {
+    return this._then(this.expectElementsNumber, async () => {
       await expect(this.find(selector)).toHaveCount(count);
     });
   }
 
-  enabled(selector = undefined) {
-    return this._then(this.enabled, async () => {
+  expectEnabled(selector = undefined) {
+    return this._then(this.expectEnabled, async () => {
       await expect(this.find(selector)).toBeEnabled();
     });
   }
 
-  disabled(selector = undefined) {
-    return this._then(this.disabled, async () => {
+  expectDisabled(selector = undefined) {
+    return this._then(this.expectDisabled, async () => {
       await expect(this.find(selector)).toBeDisabled();
     });
   }
 
-  visible(selector = undefined) {
-    return this._then(this.visible, async () => {
+  expectVisible(selector = undefined) {
+    return this._then(this.expectVisible, async () => {
       await expect(this.find(selector)).toBeVisible();
     });
   }
 
-  hidden(selector = undefined) {
-    return this._then(this.hidden, async () => {
+  expectHidden(selector = undefined) {
+    return this._then(this.expectHidden, async () => {
       await expect(this.find(selector)).toBeHidden();
     });
   }
 
-  matchStyles(styles, selector = undefined) {
-    return this._then(this.matchStyles, async () => {
+  expectStyles(styles, selector = undefined) {
+    return this._then(this.expectStyles, async () => {
       const target = this.find(selector);
       await promiseFlow(Object.entries(styles).map(([key, value]) => expect(target).toHaveCSS(key, value)));
       // const expectedCss = styles.map(el => el.split(':')).reduce((R, [k, v]) => Object.assign(R, { [k.trim()]: v.trim() }), {});
@@ -473,8 +418,8 @@ export class PageRunner {
     });
   }
 
-  matchAttr(attr, selector = undefined) {
-    return this._then(this.matchAttr, async () => {
+  expectAttributes(attr, selector = undefined) {
+    return this._then(this.expectAttributes, async () => {
       const target = this.find(selector);
       await promiseFlow(Object.entries(attr).map(([key, value]) => expect(target).toHaveAttribute(key, value)));
       // const currentAttr = await getAttributes(target, Object.keys(attr));
@@ -564,20 +509,20 @@ export class PageRunner {
     });
   }
 
-  seeText(text, element = undefined) {
-    return this._then(this.seeText, async () => {
+  expectText(text, element = undefined) {
+    return this._then(this.expectText, async () => {
       await expect(this.find(element)).toContainText(text);
     });
   }
 
-  seeExactText(text, element = undefined) {
-    return this._then(this.seeExactText, async () => {
+  expectExactText(text, element = undefined) {
+    return this._then(this.expectExactText, async () => {
       await expect(this.find(element)).toHaveText(text);
     });
   }
 
-  matchValue(field, value) {
-    return this._then(this.matchValue, async () => {
+  expectValue(field, value) {
+    return this._then(this.expectValue, async () => {
       await expect(this.find(field)).toHaveValue(value);
       // const targetValue = await target.evaluate(el => el.value);
       // if (!matchString(targetValue, value, strict)) {
@@ -595,14 +540,6 @@ export class PageRunner {
       } else {
         await expect(this.currentPage).toHaveURL(urlOrPath);
       }
-      // let currentPath = '';
-      // const isOk = await this._waitPromise(() => {
-      //   currentPath = (new URL(this.currentPage.urlOrPath())).pathname;
-      //   return matchString(currentPath, urlOrPath, strict);
-      // }, { timeout });
-      // if (!isOk) {
-      //   expectToBe('Current page urlOrPath', currentPath, strict ? urlOrPath : `contains '${urlOrPath}'`);
-      // }
     });
   }
 
@@ -773,6 +710,41 @@ export class PageRunner {
       }
       const request = page.networkListener.findRequests(url, true).pop();
       await matcher(request.response());
+    });
+  }
+
+  get apiContext() {
+    return this.currentPage.request;
+  }
+
+  _enhanceUrl(url) {
+    if (/^https?:\/\//i.test(url)) return url;
+    const { currentUrl } = this;
+    if (url.startsWith('/')) return `${currentUrl.origin}${url}`;
+    return `${currentUrl.origin}${currentUrl.pathname}/${url}`;
+  }
+
+  async fetch(url, options = {}) {
+    const fullUrl = this._enhanceUrl(url);
+    this.log('fetch', fullUrl);
+    return this.apiContext.fetch(fullUrl, options);
+  }
+
+  expectFetch(url, options, expected) {
+    return this._then(this.expectFetch, async () => {
+      const result = await this.fetch(url, options);
+      if (expected.status) {
+        expect(result.status()).toBe(expected.status || expected);
+      }
+      if (expected.data) {
+        if (isString(expected.data)) {
+          const data = await result.text();
+          expect(data).toBe(expected.data);
+        } else {
+          const data = await result.json();
+          expect(data).toEqual(expected.data);
+        }
+      }
     });
   }
 }

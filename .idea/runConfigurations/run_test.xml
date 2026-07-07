@@ -5,7 +5,7 @@
     <scripts>
       <script value="example" />
     </scripts>
-    <arguments value="$FileName$" />
+    <arguments value="$FileName$ -- --last-failed" />
     <node-interpreter value="project" />
     <envs>
       <env name="PLAYWRIGHT_HTML_OPEN" value="never" />
