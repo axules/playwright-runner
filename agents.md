@@ -10,7 +10,7 @@
 1. [Project Overview](#-project-overview)
 2. [Architecture](#-architecture)
 3. [API Reference](#-api-reference)
-4. [Selector Syntax (resolveLocator)](#-selector-syntax-resolvelocator)
+4. [Selector Syntax](#-selector-syntax)
 5. [Error System](#-error-system)
 6. [Configuration](#-configuration)
 7. [Testing](#-testing)
@@ -39,7 +39,7 @@ import { PageRunner } from '../src/runner';
 
 PageRunner.create(page)                          // basic usage
   .goto('https://example.com')
-  .see('h1')
+  .seeElement('h1')
   .run();                                        // required — executes the chain
 
 PageRunner.create(page, { debug: true })         // with debug logging
@@ -77,13 +77,16 @@ playwright-runner/
 │       ├── makeExpectedError.js      # Colored error formatting (red/green)
 │       ├── MatcherError.js           # Custom assertion error class
 │       ├── PageNetworkListener.js    # Network request/response monitoring
-│       ├── resolveLocator.js         # Shorthand selector parser
+│       ├── resolveCssLocator.js      # CSS selector parser with `:@method(arg)` syntax
+│       ├── resolveLocator.js         # Shorthand `|>` selector parser
+│       ├── RunnerLocator.js          # Programmatic locator builder class
 │       ├── screenshotReporter.js     # Legacy Jasmine screenshot reporter
 │       ├── ShotMatchError.js         # Screenshot mismatch error
 │       ├── takeScreenshot.js         # Screenshot utility with URL overlay
-│       ├── utils.js                  # Shared utilities (selectors, styles, attrs)
+│       ├── utils.js                  # Shared utilities (selectors, styles, attrs, promiseFlow)
 │       └── tests/
-│           └── resolveLocator.test.js    # Unit test for resolveLocator
+│           ├── resolveCssLocator.test.js  # Unit tests for resolveCssLocator
+│           └── resolveLocator.test.js     # Unit tests for resolveLocator
 └── examples/
     ├── google.uitest.js              # Mobile template + geolocation example (raw Playwright)
     └── zapiski.uitest.js             # Fluent API example
@@ -95,7 +98,7 @@ playwright-runner/
 
 ### 1. `PageRunner.create(pageOrLocator, config?)` — Entry Point
 
-Static factory method that creates a `PageRunner` instance. If `pageOrLocator` is a Playwright **Page**, it automatically wraps it with `page.locator('body')`.
+Static factory method that creates a `PageRunner` instance. If `pageOrLocator` is a Playwright **Page**, it automatically wraps it with `page.locator('html')`.
 
 ```js
 import { PageRunner } from '../src/runner';
@@ -117,12 +120,11 @@ The constructor also accepts direct instantiation: `new PageRunner(pageOrLocator
 **Internal mechanics:**
 
 - **`this.pull`** — A Promise queue. Each method call appends a step via `this._then()`. Steps execute sequentially in FIFO order when `.run()` is called.
-- **`this.locatorsWay`** — A locator stack. `moveTo*` methods push, `moveBack`/`moveToInitial` pop. Used for contextual scoping.
-- **`this.page`** — Reference to the Playwright `Page` object (extracted from any Locator via `getPage()`).
+- **`this.locatorsWay`** — A locator stack. `within*` methods push, `withinBack`/`withinInitial` pop. Used for contextual scoping.
+- **`this._page`** — Reference to the Playwright `Page` object (extracted from any Locator via `getPage()`).
 - **`this.runCallerCounter`** — Debug counter incremented per step, used in log output.
-- **`this._disabled.not` / `this._checked.not` / `this._has.not`** — Negated assertion helpers set up during `init()`.
 - **`_createMatcher()`** — Wrapper around each step: catches errors, augments them with current locator and method name context.
-- **`initNetworkListener()`** — Called in constructor; attaches `PageNetworkListener` to the page if not already present.
+- **`initNetworkListener()`** — Available but **not called automatically** in constructor (commented out). Attach manually via `initNetworkListener(this._page)` if needed.
 
 ### 3. `promiseFlow` (from [`src/tools/utils.js`](src/tools/utils.js:124))
 
@@ -137,6 +139,8 @@ promiseFlow([fn1, fn2, fn3]);
 
 Auto-attached to the page in the `PageRunner` constructor via `initNetworkListener()`. Intercepts network requests via `page.on('request')` / `page.on('requestfinished')` / `page.on('requestfailed')` and stores them for later inspection with `matchRequest` / `matchResponse`. Tracks `activeRequests` count in real-time.
 
+> **Note:** `initNetworkListener()` is **commented out** in the constructor. Attach it manually if you need network request tracking: `initNetworkListener(this._page)`.
+
 ---
 
 ## 🔧 API Reference
@@ -145,11 +149,11 @@ Auto-attached to the page in the `PageRunner` constructor via `initNetworkListen
 
 | Method | Description | Implementation |
 |--------|-------------|----------------|
-| `moveTo(selector)` | Switch context to `page.locator(selector)` | Redirects current locator |
-| `moveToChild(selector)` | Switch to `currentLocator.locator(selector)` | Nested locator |
-| `moveToBody()` | Reset to `body` locator | Direct assignment |
-| `moveToInitial()` | Return to initial locator | Pops entire stack |
-| `moveBack(steps?)` | Go back N steps in locator stack | Pop from stack |
+| `within(selector)` | Switch context to `page.locator(selector)` | Redirects current locator |
+| `withinChild(selector)` | Switch to `currentLocator.locator(selector)` | Nested locator |
+| `withinBody()` | Reset to `body` locator | Direct assignment |
+| `withinInitial()` | Return to initial locator | Pops entire stack |
+| `withinBack(steps?)` | Go back N steps in locator stack | Pop from stack |
 
 ### Actions
 
@@ -160,7 +164,8 @@ Auto-attached to the page in the `PageRunner` constructor via `initNetworkListen
 | `click(selector?, options?)` | Click with `toBeEnabled` pre-check | Enabled state |
 | `fill(selector, text, options?)` | Fill input with pre-check | Enabled state |
 | `fillForm(selector, data)` | Fill form fields by `[name]` attribute | 3x click + type |
-| `press(selector, button, options?)` | Press key(s); arrays are chained | — |
+| `pressKey(key, selector?)` | Press key(s); arrays are chained | — |
+| `pressEnter(selector?)` / `pressEsc(selector?)` / `pressTab(selector?)` / `pressSpace(selector?)` | Convenience shortcuts for common keys | — |
 | `select(selector, values)` | Select `<option>` values | — |
 | `clear(selector?)` | Clear input field | — |
 | `focus(selector?)` / `blur(selector?)` | Focus/blur element | — |
@@ -171,37 +176,31 @@ Auto-attached to the page in the `PageRunner` constructor via `initNetworkListen
 
 | Method | Description | Playwright Equivalent |
 |--------|-------------|----------------------|
-| `see(selector?)` | Element is visible | `toBeVisible()` |
-| `dontSee(selector?)` | Element is hidden | `toBeHidden()` |
-| `seeText(text)` | Locator contains text | `toContainText()` |
-| `seeExactText(text)` | Locator has exact text | `toHaveText()` |
-| `enabled(selector?)` | Element is enabled | `toBeEnabled()` |
-| `disabled(selector?)` | Element is disabled | `toBeDisabled()` via `el.disabled` |
-| `checked(selector?)` | Element is checked | `el.checked` via evaluate (supports `.not`) |
-| `matchValue(selector, value, strict?)` | Check input value via `matchString` | Custom |
-| `matchStyles(selector, styles)` | Check CSS styles (`['display:flex']`) | Custom via `getComputedStyle` |
-| `matchAttr(selector, attr)` | Check attributes (`{href: '/path'}`) | Custom via `getAttribute` |
-| `has(selectors)` | Check element count; supports min/max range (supports `.not`) | Custom via `selectElements` |
-| `hasUrl(urlOrPath)` | Check current URL (supports `*`/`**` wildcards) | Custom |
-| `hasQueryParams(expectedParams, strict?)` | Check URL query params (⚠️ **unimplemented** — throws) | Custom |
+| `seeElement(selector?)` | Element is visible | `toBeVisible()` |
+| `dontSeeElement(selector?)` | Element is hidden | `toBeHidden()` |
+| `expectVisible(selector?)` | Element is visible (explicit) | `toBeVisible()` |
+| `expectHidden(selector?)` | Element is hidden (explicit) | `toBeHidden()` |
+| `expectText(text, selector?)` | Locator contains text | `toContainText()` |
+| `expectExactText(text, selector?)` | Locator has exact text | `toHaveText()` |
+| `expectEnabled(selector?)` | Element is enabled | `toBeEnabled()` |
+| `expectDisabled(selector?)` | Element is disabled | `toBeDisabled()` |
+| `expectValue(selector, value)` | Check input value | `toHaveValue()` |
+| `expectStyles(styles, selector?)` | Check CSS styles `({display: 'flex'})` | `toHaveCSS()` |
+| `expectAttributes(attr, selector?)` | Check attributes `({href: '/path'})` | `toHaveAttribute()` |
+| `expectElementsNumber(count, selector?)` | Check element count | `toHaveCount()` |
+| `hasUrl(urlOrPath)` | Check current URL (supports `*`/`**` wildcards) | `toHaveURL()` |
+| `hasQueryParams(expectedParams)` | Check URL query params | `toHaveURL()` callback |
+| `expectFetch(url, options, expected)` | Fetch and assert response | Custom |
 
-**`has()` usage:**
+**`hasUrl()` usage:**
 
 ```js
-// Single selector — expects exactly 1 match
-runer.has('button')
+// Full URL match
+runner.hasUrl('https://example.com/page')
 
-// Multiple selectors
-runer.has(['button', 'input'])
-
-// With count expectations — { selector: count }
-runer.has({ button: 3 })
-
-// With range — { selector: [min, max] }
-runer.has({ 'div.error': [0, 2] })
-
-// Negation — .has.not()
-runer.has.not('.error-modal')
+// Relative path with wildcard
+runner.hasUrl('*/path')         // same origin + /path
+runner.hasUrl('**/page')        // any URL ending with /page
 ```
 
 ### Screenshots
@@ -231,8 +230,15 @@ runer.has.not('.error-modal')
 | `pause()` | Playwright `page.pause()` (debug panel) |
 | `say(text)` | `console.log` during chain execution |
 | `where()` | Log current locator |
-| `fullWay()` | Log entire locator stack |
+| `fullPath()` | Log entire locator stack |
 | `run()` | **REQUIRED**: executes the entire chain, returns `Promise<PageRunner>` |
+
+### Fetch / API
+
+| Method | Description |
+|--------|-------------|
+| `fetch(url, options?)` | Make an HTTP request relative to current page origin |
+| `expectFetch(url, options, expected)` | Fetch and assert response status/data |
 
 ### Getters
 
@@ -241,11 +247,42 @@ runer.has.not('.error-modal')
 | `runner.currentLocator` | Current Playwright `Locator` |
 | `runner.currentPage` | Playwright `Page` |
 | `runner.currentUrl` | `new URL(page.url())` |
-| `runner.find(selector?)` | Resolved locator (current or child via `resolveLocator`) |
+| `runner.find(selector?)` | Resolved locator (current or child via `resolveCssLocator`) |
+| `runner.apiContext` | Playwright `page.request` (APIRequestContext) |
 
 ---
 
-## 🔍 Selector Syntax (resolveLocator)
+## 🔍 Selector Syntax
+
+### resolveCssLocator (`:@method(arg)` syntax)
+
+File: [`src/tools/resolveCssLocator.js`](src/tools/resolveCssLocator.js)
+
+The `resolveCssLocator` function parses a CSS selector string with custom `:@method(arg)` directives into Playwright locator method calls. This allows more readable selectors with inline text, role, label, placeholder, and title matching.
+
+### Exported functions
+
+| Function | Purpose |
+|----------|---------|
+| `parseCssSelector(selector)` | Split CSS selector by `:@method(arg)` directives |
+| `resolveCustomMethod(customMethod)` | Resolve a single `:@method(arg)` into a `[method, ...args]` tuple |
+| `resolveCssQuery(value)` | Parse full value into array of `[method, ...args]` tuples |
+| `resolveCssLocator(parent, selector)` | Resolve a CSS selector string against a parent locator |
+
+### Custom CSS Syntax Table
+
+| Shorthand | Resolves To | Example |
+|-----------|-------------|---------|
+| `div:@text(Submit)` | `locator('div').filter({ hasText: 'Submit' })` | Filter by text (no node) |
+| `*:@text(Submit)` | `getByText('Submit')` | Find child by text (with node) |
+| `div:@role(button)` | `locator('div').getByRole('button')` | Match by ARIA role |
+| `form:@label(email)` | `locator('form').getByLabel('email')` | Match by label |
+| `input:@placeholder(Enter name)` | `locator('input').getByPlaceholder('Enter name')` | Match by placeholder |
+| `a:@title(Click here)` | `locator('a').getByTitle('Click here')` | Match by title |
+| `div:@text("Submit (123)")` | `locator('div').filter({ hasText: 'Submit (123)' })` | Quoted arg with parentheses |
+| `div >*:@text(Content)` | `locator('div').getByText('Content')` | Node prefix `>*` for `getByText` |
+
+### resolveLocator (`|>` shorthand syntax)
 
 File: [`src/tools/resolveLocator.js`](src/tools/resolveLocator.js)
 
@@ -267,7 +304,7 @@ The `resolveLocator` function parses a shorthand string into Playwright locator 
 | `button` | `locator('button')` | CSS/tag selector (default) |
 | `:"Текст"` | `getByText('Текст')` | Exact text match |
 | `:"*текст*"` | `getByText(/текст/i)` | Case-insensitive substring |
-| `"Текст"` | `getByText('Текст')` | (alias, without colon) |
+| `"Текст"` | `filter({ hasText: 'Текст' })` | (alias, without colon) |
 | `:button"Кнопка"` | `getByRole('button', { name: 'Кнопка' })` | Role + accessible name |
 | `:button"*кнопк*"` | `getByRole('button', { name: /кнопк/i })` | Role + regex name |
 | `:~метка` | `getByLabel('метка')` | By `aria-label` or associated `<label>` |
@@ -387,13 +424,14 @@ This means errors bubble up with full context, making debugging easier without m
 
 ### Current unit tests
 
-- [`src/tools/tests/resolveLocator.test.js`](src/tools/tests/resolveLocator.test.js) — Tests for shorthand selector parsing (`resolveQuery`, `resolveQueryPiece`, `resolveText`)
+- [`src/tools/tests/resolveCssLocator.test.js`](src/tools/tests/resolveCssLocator.test.js) — Tests for CSS `:@method(arg)` selector parsing (`parseCssSelector`, `resolveCustomMethod`, `resolveCssQuery`, `resolveCssLocator`)
+- [`src/tools/tests/resolveLocator.test.js`](src/tools/tests/resolveLocator.test.js) — Tests for shorthand `|>` selector parsing (`resolveQuery`, `resolveQueryPiece`, `resolveText`)
 
 ---
 
 ## 📌 Important Caveats
 
-1. **`page.networkListener`** — This property is auto-attached to the page object by the `PageRunner` constructor. Do not override or manually instantiate `PageNetworkListener`.
+1. **`page.networkListener`** — This property is NOT auto-attached by the `PageRunner` constructor (the line is commented out). Attach manually if needed: `initNetworkListener(this._page)`.
 
 2. **_getTarget / _getTargets** — These internal methods use `selectElement` / `selectElements` from [`src/tools/utils.js`](src/tools/utils.js). They support:
    - XPath (prefix `/`)
@@ -415,11 +453,11 @@ This means errors bubble up with full context, making debugging easier without m
 
 7. **All methods return `this`** — Except `.run()`, which returns `Promise<PageRunner>`. This enables chaining.
 
-8. **`hasQueryParams` is unimplemented** — The method exists but throws `throw new Error('IMPLEMENT IT')`. Do not use in tests.
+8. **`hasQueryParams` is implemented** — The method uses `toHaveURL()` callback to validate query parameters. No longer throws.
 
-9. **Negated assertion helpers** — `disabled.not`, `checked.not`, and `has.not` are set up in the `init()` method. They invert the assertion: `.checked.not(selector)` asserts the element is NOT checked, `.has.not('.error')` asserts NO matching elements exist.
+9. **Negated assertion helpers removed** — `_disabled.not`, `_checked.not`, and `_has.not` no longer exist. Use `expectDisabled`, `dontSeeElement`, or standard Playwright assertions instead.
 
-10. **`fillForm` uses 3x click + type** — This method triple-clicks each field (to select all text) then types the value. For array/function values, it supports dynamic value resolution per field index.
+10. **`fillForm` uses `fill` + `clear`** — This method calls `fill(String(value))` or `clear()` per field (not triple-click). For array/function values, it supports dynamic value resolution per field index.
 
 11. **Coding conventions:**
     - Variables/functions: `camelCase`
@@ -442,17 +480,19 @@ import {PageRunner} from '../src/runner';
 test('Check login and registration forms', async ({page}) => {
   await PageRunner.create(page, {debug: true})
     .goto('https://zapiski.online')
-    .withinChild('.cookiesNotification')
+    .within('.cookiesNotification')
     .expectText('Мы используем cookies для работы сервиса. Продолжая пользоваться сервисом ЗапискиОнлайн, вы принимаете')
     .click('button')
-    .dontSee()
+    .dontSeeElement()
     .reloadPage()
-    .dontSee()
+    .dontSeeElement()
     .within('#login_frame')
     .expectText('Войти')
-    .click('"Регистрация"')
+    .click('li:@text(Регистрация)')
     .expectText('Повторите пароль')
+    .where()
     .fullPath()
+    .expectFetch('/json/m_authf/aj_get_info', {}, { status: 200 })
     .run();
 });
 ```
