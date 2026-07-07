@@ -79,12 +79,7 @@ export class PageRunner {
     const locator = isPage(initialLocator) ? initialLocator.locator('html') : initialLocator;
 
     this.init = () => {
-      const {
-        debug = false,
-        updateShot = false,
-        screenshotTool = defaultScreenshotMaster,
-        targetTimeout = 2500,
-      } = options;
+      const { debug = false } = options;
 
       this.runCallerCounter = 0;
       this.locatorsWay = [locator];
