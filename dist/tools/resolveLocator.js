@@ -20,7 +20,7 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
  *
  * @param {string} text - The text to resolve. May contain `*` wildcards.
  * @returns {string|RegExp} - The original string if no wildcards found,
- *                            otherwise a case-insensitive RegExp where `*`
+ *                            otherwise a case-insensitive RegExp sayWhere `*`
  *                            is replaced with `.*`.
  *
  * @example
@@ -50,7 +50,7 @@ function resolveText(text) {
  * Wildcard `*` in text/label/role creates a case-insensitive RegExp.
  *
  * @param {string} locatorPiece - A single shorthand locator piece (no `|>` chaining).
- * @returns {[string, ...*]} - A tuple where the first element is the Playwright
+ * @returns {[string, ...*]} - A tuple sayWhere the first element is the Playwright
  *                             method name, and the rest are its arguments.
  *
  * @example
