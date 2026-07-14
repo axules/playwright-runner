@@ -26,13 +26,14 @@ import { resolveText } from './resolveLocator';
  *   - `:@role(button)` — match by ARIA role
  *   - `:@label(any label)` — match by aria-label or associated label
  *   - `:@placeholder(any text)` — match by placeholder attribute
+ *   - `:@title(Click here)` — match by title attribute
  *   - `*:@text(Submit)` — filter within the current element by text
+ *   - `"quoted arg (with parens)"` — quoted arguments allow parentheses inside
  *
  * @param {string} selector - The CSS selector string, possibly containing `:@method(arg)` calls.
  * @returns {Array<string|{method: string, arg: string, node: string|null}>}
  *   An array of alternating strings (plain CSS parts) and objects (custom method descriptors).
- * @throws {Error} If combined selectors (with `,`) are used, or if a custom function
- *   is not applied to a valid preceding selector.
+ * @throws {Error} If a custom function is not applied to a valid preceding selector.
  *
  * @example
  * parseCssSelector('button:@text(Submit)')
@@ -41,6 +42,14 @@ import { resolveText } from './resolveLocator';
  * @example
  * parseCssSelector('div.form > *:@text(Error)')
  * // ['div.form >', { method: 'text', arg: 'Error', node: '*' }]
+ *
+ * @example
+ * parseCssSelector('a:@title(Click here)')
+ * // ['a', { method: 'title', arg: 'Click here', node: null }]
+ *
+ * @example
+ * parseCssSelector('div:@text("Submit (123)")')
+ * // ['div', { method: 'text', arg: 'Submit (123)', node: null }]
  */
 export function parseCssSelector(selector) {
   // Ignored CSS without special rules
@@ -149,11 +158,13 @@ export function resolveCssQuery(value) {
  *   - `:@role(button)` — match by ARIA role
  *   - `:@label(any label)` — match by aria-label or associated label
  *   - `:@placeholder(any text)` — match by placeholder attribute
+ *   - `:@title(Click here)` — match by title attribute
  *   - `*:@text(Submit)` — filter within the current element by text
+ *   - `"quoted arg (with parens)"` — quoted arguments allow parentheses inside
  *
  * @param {import('playwright').Locator|import('playwright').Page} parent - The parent Playwright Locator
  *   to resolve the selector against.
- * @param {string|Array<string>|import('playwright').Locator} selector -
+ * @param {string|Array<string|{method: string, arg: string, node: string|null}>|import('playwright').Locator} selector -
  *   A CSS selector string (possibly with `:@method(arg)` directives), an array of
  *   mixed strings and custom method descriptors, or a raw Locator.
  * @returns {import('playwright').Locator} The resolved Playwright Locator.
@@ -165,6 +176,10 @@ export function resolveCssQuery(value) {
  * @example
  * resolveCssLocator(page.locator('body'), 'div.form > *:@text(Error)')
  * // page.locator('div.form > *').getByText(/Error/i)
+ *
+ * @example
+ * resolveCssLocator(page.locator('body'), ['div.form', { method: 'text', arg: 'Error', node: '*' }])
+ * // page.locator('div.form').getByText(/Error/i)
  *
  * @example
  * resolveCssLocator(page.locator('body'), page.locator('existing'))

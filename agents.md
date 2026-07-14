@@ -27,7 +27,7 @@
 | Problem | Solution |
 |---------|----------|
 | Playwright's native API is verbose for sequential steps | Fluent interface (method chaining) |
-| Managing async execution order is manual | Automatic Promise queue serialization via `this.pull` |
+| Managing async execution order is manual | Automatic Promise queue serialization via `this.actionsPull` |
 | Unclear assertion error messages | Custom `MatcherError` with colored Expected/Received |
 | Screenshot diffing requires boilerplate | Built-in `matchShot` with pixelmatch integration |
 | Debugging test steps is cumbersome | Built-in debug logging via `debug: true` option |
@@ -113,16 +113,15 @@ The constructor also accepts direct instantiation: `new PageRunner(pageOrLocator
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `debug` | `boolean` | `false` | Logs each step with timestamp |
-| `updateShot` | `boolean` | `false` | Screenshot update mode — overridden by `NODE_MODE=update` env |
-| `screenshotTool` | `function` | `defaultScreenshotMaster` | Custom screenshot function (see [`takeScreenshot.js`](src/tools/takeScreenshot.js)) |
-| `targetTimeout` | `number` | `2500` | Timeout for element visibility (ms) |
 
 **Internal mechanics:**
 
-- **`this.pull`** — A Promise queue. Each method call appends a step via `this._then()`. Steps execute sequentially in FIFO order when `.run()` is called.
+- **`this.actionsPull`** — A Promise queue. Each method call appends a step via `this._pushAction()`. Steps execute sequentially in FIFO order when `.run()` is called.
 - **`this.locatorsWay`** — A locator stack. `within*` methods push, `withinBack`/`withinInitial` pop. Used for contextual scoping.
 - **`this._page`** — Reference to the Playwright `Page` object (extracted from any Locator via `getPage()`).
 - **`this.runCallerCounter`** — Debug counter incremented per step, used in log output.
+- **`this.log()`** — Debug logger; no-op unless `debug: true` is set in constructor options.
+- **`this.init()`** — Initialization method called in constructor; resets state (counters, locator stack, action queue).
 - **`_createMatcher()`** — Wrapper around each step: catches errors, augments them with current locator and method name context.
 - **`initNetworkListener()`** — Available but **not called automatically** in constructor (commented out). Attach manually via `initNetworkListener(this._page)` if needed.
 
@@ -161,9 +160,9 @@ Auto-attached to the page in the `PageRunner` constructor via `initNetworkListen
 |--------|-------------|-----------|
 | `goto(url, waitForSelector?, timeout?)` | Navigate; relative URLs resolve against `page.url()` origin | — |
 | `reloadPage(waitForSelector?, timeout?)` | Reload current page | — |
-| `click(selector?, options?)` | Click with `toBeEnabled` pre-check | Enabled state |
-| `fill(selector, text, options?)` | Fill input with pre-check | Enabled state |
-| `fillForm(selector, data)` | Fill form fields by `[name]` attribute | 3x click + type |
+| `click(selector?, options?)` | Click element | — |
+| `fill(selector, text, options?)` | Fill input field | — |
+| `fillForm(data, parent?)` | Fill form fields by `[name]` attribute | fill + clear |
 | `pressKey(key, selector?)` | Press key(s); arrays are chained | — |
 | `pressEnter(selector?)` / `pressEsc(selector?)` / `pressTab(selector?)` / `pressSpace(selector?)` | Convenience shortcuts for common keys | — |
 | `select(selector, values)` | Select `<option>` values | — |
@@ -215,7 +214,6 @@ runner.hasUrl('**/page')        // any URL ending with /page
 
 | Method | Description |
 |--------|-------------|
-| `waitForNavigation(selector?, timeout?)` | Wait for page navigation + optional element |
 | `waitForRequest({minCount?, timeout?})` | Wait until active requests <= minCount |
 | `listenNetwork()` | Start recording requests/responses (clears previous history) |
 | `stopListenNetwork()` | Stop recording |
@@ -231,6 +229,7 @@ runner.hasUrl('**/page')        // any URL ending with /page
 | `say(text)` | `console.log` during chain execution |
 | `where()` | Log current locator |
 | `fullPath()` | Log entire locator stack |
+| `act(func)` | Execute arbitrary user function as a step (receives `{runner, page}`) |
 | `run()` | **REQUIRED**: executes the entire chain, returns `Promise<PageRunner>` |
 
 ### Fetch / API
@@ -363,7 +362,7 @@ This means errors bubble up with full context, making debugging easier without m
 | `testDir` | `'./examples'` |
 | `testMatch` | `'*.uitest.js'` |
 | Timeout (global) | 5s |
-| `waitUntil` | `'networkidle'` |
+| `waitUntil` | `'load'` |
 | `preserveOutput` | `'failures-only'` |
 | `repeatEach` | 1 |
 | `fullyParallel` | `true` |
@@ -394,7 +393,7 @@ This means errors bubble up with full context, making debugging easier without m
 
 | Field | Value |
 |-------|-------|
-| `version` | `1.0.2` |
+| `version` | `1.0.9` |
 | `main` | `'./dist/runner.js'` |
 | `exports` | `'.' / './runner' → './dist/runner.js'`; `'./tools/*' → './dist/tools/*'` |
 | `files` | `['dist', 'src']` |
@@ -446,6 +445,7 @@ This means errors bubble up with full context, making debugging easier without m
    - `saveCurrent` parameter is `true`
    
    Otherwise, they are compared using `diffImages` (pixelmatch), and a `ShotMatchError` is thrown on mismatch.
+   > **Note:** `updateShot` and `screenshotTool` constructor options are **commented out** in the `init()` method. They are still referenced in `matchShot`/`saveShot` methods.
 
 5. **`resolveLocator` chaining** — The `|>` separator creates a chain of locator queries. Each segment is resolved independently and applied sequentially on the parent locator.
 
@@ -492,7 +492,10 @@ test('Check login and registration forms', async ({page}) => {
     .expectText('Повторите пароль')
     .where()
     .fullPath()
-    .expectFetch('/json/m_authf/aj_get_info', {}, { status: 200 })
+    .expectFetch('/json/m_authf/aj_get_info', {}, {status: 200})
+    .act(async ({page}) => {
+      await page.setViewportSize({width: 640, height: 640});
+    })
     .run();
 });
 ```

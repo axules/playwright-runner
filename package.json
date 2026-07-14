@@ -18,7 +18,10 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "examples",
+    "agents.md",
+    "README.md"
   ],
   "devDependencies": {
     "@babel/cli": "8.0.1",

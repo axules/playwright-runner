@@ -16,8 +16,10 @@ test('Check login and registration forms', async ({ page }) => {
     .expectText('Войти')
     .click('li:@text(Регистрация)')
     .expectText('Повторите пароль')
-    .where()
-    .fullPath()
+    .sayWhere()
+    .sayFullPath()
     .expectFetch('/json/m_authf/aj_get_info', {}, { status: 200 })
-    .run();
+    .act(async ({ page }) => {
+      await page.setViewportSize({ width: 640, height: 640 });
+    });
 });
