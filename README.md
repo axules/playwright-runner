@@ -6,7 +6,7 @@
 
 ## Overview
 
-**Playwright Runner** provides a lightweight, declarative wrapper around Playwright with a **fluent chainable API**. Each method call represents a single test step; steps are serialized into a Promise queue and executed only when `.run()` is called.
+**Playwright Runner** provides a lightweight, declarative wrapper around Playwright with a **fluent chainable API**. Each method call represents a single test step; steps are auto-executed as the chain is built.
 
 ### Why?
 
@@ -46,13 +46,9 @@ test('Test example', async ({ page }) => {
   await PageRunner.create(page)
     .goto('https://example.com')
     .seeElement('h1')
-    .expectText('Example Domain', 'h1')
-    .run();
+    .expectText('Example Domain', 'h1');
 });
 ```
-
-> **Note:** `.run()` is **mandatory** — without it, no steps execute. The chain only builds a queue of promises.
-
 ---
 
 ## API Reference
@@ -159,7 +155,6 @@ runner.hasUrl('**/page')        // any URL ending with /page
 | `sayWhere()` | Log current locator |
 | `sayFullPath()` | Log entire locator stack |
 | `act(func)` | Execute arbitrary user function as a step (receives `{ runner, page }`) |
-| `run()` | **Required** — executes the entire chain, returns `Promise<PageRunner>` |
 | `then(onFulfilled?, onRejected?)` | Thenable interface; enables `await` on the runner instance directly |
 | `waitForRequestAfterTrigger(triggerFn, checkRequest)` | Trigger an action and wait for a specific network request |
 | `waitForFunction(callback)` | Wait for a function to return a truthy value (`page.waitForFunction`) |
@@ -199,6 +194,12 @@ Custom directives embedded in CSS selectors for more expressive queries. Parsed 
 | `a:@title(Click here)` | `locator('a').getByTitle('Click here')` | Match by title |
 | `div:@text("Submit (123)")` | `locator('div').filter({ hasText: 'Submit (123)' })` | Quoted arg with parentheses |
 | `div >*:@text(Content)` | `locator('div').getByText('Content')` | Node prefix `>*` for `getByText` |
+| `li:@at(index)` | `locator('li').nth(index)` | Select nth element by index (zero-based) |
+| `li:@first()` | `locator('li').first()` | Select the first element |
+| `li:@last()` | `locator('li').last()` | Select the last element |
+
+**Wildcard `*` behavior:** In `text`, `label`, `role`, `placeholder`, and `title` methods, `*` is converted to a regex (`.*`) with case-insensitive flag.  
+Example: `div:@text("*hello*")` → `locator('div').filter({ hasText: /^.*hello.*$/i })`
 
 ### Shorthand `|>` Syntax
 
@@ -254,8 +255,7 @@ test('Check login and registration forms', async ({ page }) => {
     .expectFetch('/json/m_authf/aj_get_info', {}, { status: 200 })
     .act(async ({ page }) => {
       await page.setViewportSize({ width: 640, height: 640 });
-    })
-    .run();
+    });
 });
 ```
 
@@ -267,8 +267,7 @@ await PageRunner.create(page)
   .act(async ({ runner, page }) => {
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   })
-  .seeElement('.footer')
-  .run();
+  .seeElement('.footer');
 ```
 
 ### Screenshot matching
@@ -278,8 +277,7 @@ await PageRunner.create(page, {
   screenshotTool: screenshotTool('screenshots/my-test')
 })
   .goto('https://example.com')
-  .matchShot('h1', 'main-heading')
-  .run();
+  .matchShot('h1', 'main-heading');
 ```
 
 ### Network request/response inspection
@@ -298,8 +296,7 @@ await PageRunner.create(page)
     const data = await response.json();
     expect(data.status).toBe('ok');
   })
-  .stopListenNetwork()
-  .run();
+  .stopListenNetwork();
 ```
 
 ---
@@ -353,16 +350,14 @@ playwright-runner/
 
 1. **`page.networkListener`** — This property is **not** auto-attached by the `PageRunner` constructor. Attach manually if needed: `initNetworkListener(this._page)`.
 
-2. **`.run()` is mandatory** — Without calling `.run()` at the end of the chain, no steps execute. The chain only builds a queue of promises.
+2. **All methods return `this`** — This enables chaining. Use `await` on the runner to resolve the promise.
 
-3. **All methods return `this`** — Except `.run()`, which returns `Promise<PageRunner>`. This enables chaining.
+3. **`matchShot` behavior** — Screenshots are saved if: no reference file exists, `updateShot: true` (or `NODE_MODE=update` is set), or `saveCurrent` parameter is `true`. Otherwise they are compared using `diffImages` (pixelmatch), and a `ShotMatchError` is thrown on mismatch.
 
-4. **`matchShot` behavior** — Screenshots are saved if: no reference file exists, `updateShot: true` (or `NODE_MODE=update` is set), or `saveCurrent` parameter is `true`. Otherwise they are compared using `diffImages` (pixelmatch), and a `ShotMatchError` is thrown on mismatch.
+4. **`fillForm` uses `fill` / `clear`** — Calls `fill(String(value))` or `clear()` per field (not triple-click).
 
-5. **`fillForm` uses `fill` / `clear`** — Calls `fill(String(value))` or `clear()` per field (not triple-click).
+5. **`resolveLocator` chaining** — The `|>` separator creates a chain of locator queries. Each segment is resolved independently and applied sequentially on the parent locator.
 
-6. **`resolveLocator` chaining** — The `|>` separator creates a chain of locator queries. Each segment is resolved independently and applied sequentially on the parent locator.
+6. **`hasQueryParams`** — Uses `toHaveURL()` callback to validate query parameters.
 
-7. **`hasQueryParams`** — Uses `toHaveURL()` callback to validate query parameters.
-
-8. **Coding conventions:** camelCase variables/functions, PascalCase classes, ES modules (`import`/`export`), ESLint flat config v10.
+7. **Coding conventions:** camelCase variables/functions, PascalCase classes, ES modules (`import`/`export`), ESLint flat config v10.

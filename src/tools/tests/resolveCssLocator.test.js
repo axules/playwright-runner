@@ -35,6 +35,15 @@ describe('parseCssSelector', () => {
     ],
     [':@title', 'a:@title(Click here)', ['a', { method: 'title', arg: 'Click here' }]],
 
+    [':@at with index', 'li:@at(2)', ['li', { method: 'at', arg: '2' }]],
+    [':@first() with empty arg', 'li:@first()', ['li', { method: 'first', arg: '' }]],
+    [':@last() with empty arg', 'li:@last()', ['li', { method: 'last', arg: '' }]],
+    [':@at followed by :@text', 'li:@at(2):@text(Item)', [
+      'li',
+      { method: 'at', arg: '2' },
+      { method: 'text', arg: 'Item' },
+    ]],
+
     // Multiple :@ methods
     [
       'multiple :@ methods on the same CSS selector',
@@ -113,6 +122,15 @@ describe('resolveCustomMethod', () => {
     ['returns getByTitle', { method: 'title', arg: 'Click here' }, ['getByTitle', 'Click here']],
     ['is case-insensitive for method TEXT', { method: 'TEXT', arg: 'Hello' }, ['filter', { hasText: 'Hello' }]],
     ['is case-insensitive for method Label', { method: 'Label', arg: 'email' }, ['getByLabel', 'email']],
+    ['@at method returns nth with parsed int', { method: 'at', arg: '2' }, ['nth', 2]],
+    ['@first method returns first', { method: 'first', arg: '' }, ['first']],
+    ['@last method returns last', { method: 'last', arg: '' }, ['last']],
+    ['@first ignores dummy arg 0', { method: 'first', arg: '0' }, ['first']],
+    ['@last ignores dummy arg 0', { method: 'last', arg: '0' }, ['last']],
+    ['@at with negative index', { method: 'at', arg: '-1' }, ['nth', -1]],
+    ['resolveText is used for role method', { method: 'role', arg: '*button*' }, ['getByRole', /^.*button.*$/i]],
+    ['resolveText is used for placeholder method', { method: 'placeholder', arg: '*name*' }, ['getByPlaceholder', /^.*name.*$/i]],
+    ['resolveText is used for title method', { method: 'title', arg: '*click*' }, ['getByTitle', /^.*click.*$/i]],
   ];
 
   test.each(testCases)('%s', (name, method, expected) => {
@@ -173,6 +191,26 @@ describe('resolveCssQuery', () => {
     ]],
     ['only :@ methods and no leading CSS (no node → filter)', ':@text(Hello)', [
       ['filter', { hasText: 'Hello' }],
+    ]],
+    [':@at method returns nth', 'li:@at(2)', [
+      ['locator', 'li'],
+      ['nth', 2],
+    ]],
+    [':@first() with empty arg', 'li:@first()', [
+      ['locator', 'li'],
+      ['first'],
+    ]],
+    [':@last() with empty arg', 'li:@last()', [
+      ['locator', 'li'],
+      ['last'],
+    ]],
+    ['array with {method: first} passes through', ['li', { method: 'first' }], [
+      ['locator', 'li'],
+      ['first'],
+    ]],
+    ['array with {method: last} passes through', ['li', { method: 'last' }], [
+      ['locator', 'li'],
+      ['last'],
     ]],
   ];
 
@@ -257,6 +295,26 @@ describe('resolveCssLocator', () => {
     ]],
     [':@text only without leading CSS (no node → filter)', ':@text(Hello)', [
       ['filter', { hasText: 'Hello' }],
+    ]],
+    [':@at method returns nth call', 'li:@at(2)', [
+      ['locator', 'li'],
+      ['nth', 2],
+    ]],
+    [':@first() with empty arg', 'li:@first()', [
+      ['locator', 'li'],
+      ['first'],
+    ]],
+    [':@last() with empty arg', 'li:@last()', [
+      ['locator', 'li'],
+      ['last'],
+    ]],
+    ['array with {method: first} passes through', ['li', { method: 'first' }], [
+      ['locator', 'li'],
+      ['first'],
+    ]],
+    ['array with {method: last} passes through', ['li', { method: 'last' }], [
+      ['locator', 'li'],
+      ['last'],
     ]],
   ];
 

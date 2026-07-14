@@ -20,7 +20,7 @@
 
 ## 📋 Project Overview
 
-**playwright-runner** is a lightweight wrapper around Playwright that provides a **fluent chainable API** for writing UI tests in a declarative style. Each method call represents a single test step; steps are serialized into a Promise queue and executed only when `.run()` is called.
+**playwright-runner** is a lightweight wrapper around Playwright that provides a **fluent chainable API** for writing UI tests in a declarative style. Each method call represents a single test step; steps are auto-executed as the chain is built.
 
 ### Why this project exists
 
@@ -39,12 +39,10 @@ import { PageRunner } from '../src/runner';
 
 PageRunner.create(page)                          // basic usage
   .goto('https://example.com')
-  .seeElement('h1')
-  .run();                                        // required — executes the chain
+  .seeElement('h1');                              // auto-executes the chain
 
 PageRunner.create(page, { debug: true })         // with debug logging
-  .goto('https://example.com')
-  .run();
+  .goto('https://example.com');
 ```
 
 ### Dependencies
@@ -116,7 +114,7 @@ The constructor also accepts direct instantiation: `new PageRunner(pageOrLocator
 
 **Internal mechanics:**
 
-- **`this.actionsPull`** — A Promise queue. Each method call appends a step via `this._pushAction()`. Steps execute sequentially in FIFO order when `.run()` is called.
+- **`this.actionsPull`** — A Promise queue. Each method call appends a step via `this._pushAction()`. Steps execute sequentially in FIFO order as the chain is built.
 - **`this.locatorsWay`** — A locator stack. `within*` methods push, `withinBack`/`withinInitial` pop. Used for contextual scoping.
 - **`this._page`** — Reference to the Playwright `Page` object (extracted from any Locator via `getPage()`).
 - **`this.runCallerCounter`** — Debug counter incremented per step, used in log output.
@@ -235,7 +233,6 @@ runner.hasUrl('**/page')        // any URL ending with /page
 | `sayWhere()` | Log current locator |
 | `sayFullPath()` | Log entire locator stack |
 | `act(func)` | Execute arbitrary user function as a step (receives `{runner, page}`) |
-| `run()` | **REQUIRED**: executes the entire chain, returns `Promise<PageRunner>` |
 | `then(onFulfilled?, onRejected?)` | Thenable interface; enables `await` on the runner instance directly |
 | `waitForRequestAfterTrigger(triggerFn, checkRequest)` | Trigger an action and wait for a specific network request |
 | `waitForFunction(callback)` | Wait for a function to return a truthy value (`page.waitForFunction`) |
@@ -288,6 +285,9 @@ The `resolveCssLocator` function parses a CSS selector string with custom `:@met
 | `a:@title(Click here)` | `locator('a').getByTitle('Click here')` | Match by title |
 | `div:@text("Submit (123)")` | `locator('div').filter({ hasText: 'Submit (123)' })` | Quoted arg with parentheses |
 | `div >*:@text(Content)` | `locator('div').getByText('Content')` | Node prefix `>*` for `getByText` |
+| `li:@at(index)` | `locator('li').nth(index)` | Select nth element by index (zero-based) |
+| `li:@first()` | `locator('li').first()` | Select the first element |
+| `li:@last()` | `locator('li').last()` | Select the last element |
 
 ### resolveLocator (`|>` shorthand syntax)
 
@@ -457,17 +457,13 @@ This means errors bubble up with full context, making debugging easier without m
 
 5. **`resolveLocator` chaining** — The `|>` separator creates a chain of locator queries. Each segment is resolved independently and applied sequentially on the parent locator.
 
-6. **`.run()` is mandatory** — Without calling `.run()` at the end of the chain, no steps execute. The chain only builds a queue of promises.
+6. **`hasQueryParams` is implemented** — The method uses `toHaveURL()` callback to validate query parameters. No longer throws.
 
-7. **All methods return `this`** — Except `.run()`, which returns `Promise<PageRunner>`. This enables chaining.
+7. **Negated assertion helpers removed** — `_disabled.not`, `_checked.not`, and `_has.not` no longer exist. Use `expectDisabled`, `dontSeeElement`, or standard Playwright assertions instead.
 
-8. **`hasQueryParams` is implemented** — The method uses `toHaveURL()` callback to validate query parameters. No longer throws.
+8. **`fillForm` uses `fill` + `clear`** — This method calls `fill(String(value))` or `clear()` per field (not triple-click). For array/function values, it supports dynamic value resolution per field index.
 
-9. **Negated assertion helpers removed** — `_disabled.not`, `_checked.not`, and `_has.not` no longer exist. Use `expectDisabled`, `dontSeeElement`, or standard Playwright assertions instead.
-
-10. **`fillForm` uses `fill` + `clear`** — This method calls `fill(String(value))` or `clear()` per field (not triple-click). For array/function values, it supports dynamic value resolution per field index.
-
-11. **Coding conventions:**
+9. **Coding conventions:**
     - Variables/functions: `camelCase`
     - Classes: `PascalCase`
     - Imports: ES modules (`import`/`export`)
@@ -503,8 +499,7 @@ test('Check login and registration forms', async ({page}) => {
     .expectFetch('/json/m_authf/aj_get_info', {}, {status: 200})
     .act(async ({page}) => {
       await page.setViewportSize({width: 640, height: 640});
-    })
-    .run();
+    });
 });
 ```
 
@@ -546,8 +541,7 @@ test('match screenshot', async ({ page }) => {
     screenshotTool: screenshotTool('screenshots/my-test')
   })
     .goto('https://example.com')
-    .matchShot('h1', 'main-heading')
-    .run();
+    .matchShot('h1', 'main-heading');
 });
 ```
 
@@ -562,6 +556,5 @@ await PageRunner.create(page)
     const data = await response.json();
     expect(data.status).toBe('ok');
   })
-  .stopListenNetwork()
-  .run();
+  .stopListenNetwork();
 ```

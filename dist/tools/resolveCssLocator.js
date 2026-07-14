@@ -35,6 +35,9 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
  *   - `:@label(any label)` — match by aria-label or associated label
  *   - `:@placeholder(any text)` — match by placeholder attribute
  *   - `:@title(Click here)` — match by title attribute
+ *   - `:@at(index)` — select nth element by index (zero-based); maps to Playwright `.nth()`
+ *   - `:@first()` — select the first element
+ *   - `:@last()` — select the last element
  *   - `*:@text(Submit)` — filter within the current element by text
  *   - `"quoted arg (with parens)"` — quoted arguments allow parentheses inside
  *
@@ -71,7 +74,7 @@ function parseCssSelector(selector) {
   let execResult;
   let cursor = 0;
   // e.g. :@text(Any text), :@role(button), :@label(any label), :@placeholder(any text)
-  const customMethodsRegexp = /(>?\s?[*])??:@([a-z\d]+)\((\s*"(.+?)"\s*|([^)(]+?))\)/gi;
+  const customMethodsRegexp = /(>?\s?[*])??:@([a-z\d]+)\((\s*"(.+?)"\s*|([^)(]*?))\)/gi;
   while (execResult = customMethodsRegexp.exec(selector)) {
     const [, node, method,, arg, argFallback] = execResult;
     if (!node && /\s/.test(selector[execResult.index - 1])) {
@@ -96,13 +99,24 @@ function parseCssSelector(selector) {
  * Resolves a custom method descriptor (parsed by {@link parseCssSelector}) into
  * a Playwright locator method call tuple `[methodName, ...args]`.
  *
- * Supported methods: `text`, `label`, `role`, `placeholder`, `title`.
- * If a `node` is present (e.g. `*:@text(...)`), the `text` method returns
- * `getByText` to locate child elements; otherwise it returns `filter({ hasText })`
- * to narrow the current locator by text content.
+ * Supported methods: `text`, `label`, `role`, `placeholder`, `title`,
+ * `nth`, `first`, `last`.
+ *
+ * **Text-based methods** (`text`, `label`, `role`, `placeholder`, `title`) pass
+ * the argument through {@link resolveText}, which converts wildcard `*` patterns
+ * into RegExp (`/.*\/i`).
+ *
+ * **`text` method behavior:**
+ *   - If a `node` is present (e.g. `*:@text(...)` or `>*:@text(...)`), returns
+ *     `['getByText', resolvedArg]` — locates child elements by text.
+ *   - Otherwise returns `['filter', { hasText: resolvedArg }]` — narrows the
+ *     current locator by text content.
+ *
+ * **Index-based methods** (`nth`, `first`, `last`) ignore the `node` property
+ * and never use `resolveText`.
  *
  * @param {{ method: string, arg: string, node: string|null }} customMethod -
- *   The custom method descriptor object.
+ *   The custom method descriptor object. `arg` is ignored for `first`/`last`.
  * @returns {[string, ...*]} A tuple where the first element is the Playwright
  *   locator method name, and the rest are arguments to that method.
  * @throws {Error} If the method name is unknown.
@@ -112,12 +126,24 @@ function parseCssSelector(selector) {
  * // ['filter', { hasText: 'Submit' }]
  *
  * @example
- * resolveCustomMethod({ method: 'text', arg: 'Error', node: '*' })
- * // ['getByText', /Error/i]
+ * resolveCustomMethod({ method: 'text', arg: '*error*', node: '*' })
+ * // ['getByText', /^.*error.*$/i]
  *
  * @example
  * resolveCustomMethod({ method: 'role', arg: 'button', node: null })
- * // ['getByRole', 'button']
+ * // ['getByRole', /^button$/i]  — resolveText keeps plain strings as-is
+ *
+ * @example
+ * resolveCustomMethod({ method: 'at', arg: '2', node: null })
+ * // ['nth', 2]
+ *
+ * @example
+ * resolveCustomMethod({ method: 'first', arg: '', node: null })
+ * // ['first']
+ *
+ * @example
+ * resolveCustomMethod({ method: 'last', arg: '', node: null })
+ * // ['last']
  */
 function resolveCustomMethod(customMethod) {
   const {
@@ -139,6 +165,12 @@ function resolveCustomMethod(customMethod) {
       return ['getByPlaceholder', (0, _resolveLocator.resolveText)(arg)];
     case 'title':
       return ['getByTitle', (0, _resolveLocator.resolveText)(arg)];
+    case 'at':
+      return ['nth', parseInt(arg, 10)];
+    case 'first':
+      return ['first'];
+    case 'last':
+      return ['last'];
     default:
       throw new Error(`Unknown method ${method}`);
   }
@@ -148,6 +180,10 @@ function resolveCustomMethod(customMethod) {
  * Resolves a CSS selector value (string or array) into a sequence of Playwright
  * locator method call tuples. Each string is parsed by {@link parseCssSelector},
  * and each custom method descriptor is resolved by {@link resolveCustomMethod}.
+ *
+ * The resulting tuples can represent standard Playwright locator methods:
+ * `locator`, `filter`, `getByText`, `getByLabel`, `getByRole`,
+ * `getByPlaceholder`, `getByTitle`, `at`, `first`, `last`.
  *
  * @param {string|Array<string|{method: string, arg: string, node: string|null}>} value -
  *   A CSS selector string, an array of selector strings and/or custom method objects.
@@ -161,6 +197,14 @@ function resolveCustomMethod(customMethod) {
  * @example
  * resolveCssQuery(['div.form', { method: 'text', arg: 'Error', node: '*' }])
  * // [['locator', 'div.form'], ['getByText', /Error/i]]
+ *
+ * @example
+ * resolveCssQuery('li:@at(2)')
+ * // [['locator', 'li'], ['at', 2]]
+ *
+ * @example
+ * resolveCssQuery('li:@first')
+ * // [['locator', 'li'], ['first']]
  */
 function resolveCssQuery(value) {
   return (Array.isArray(value) ? value : [value]).flatMap(it => (0, _lodash.default)(it) ? parseCssSelector(it.trim()) : [it]).map(it => (0, _lodash.default)(it) ? ['locator', it] : resolveCustomMethod(it));
@@ -181,6 +225,9 @@ function resolveCssQuery(value) {
  *   - `:@label(any label)` — match by aria-label or associated label
  *   - `:@placeholder(any text)` — match by placeholder attribute
  *   - `:@title(Click here)` — match by title attribute
+ *   - `:@at(index)` — select nth element by index (zero-based); maps to Playwright `.nth()`
+ *   - `:@first()` — select the first element
+ *   - `:@last()` — select the last element
  *   - `*:@text(Submit)` — filter within the current element by text
  *   - `"quoted arg (with parens)"` — quoted arguments allow parentheses inside
  *
@@ -202,6 +249,10 @@ function resolveCssQuery(value) {
  * @example
  * resolveCssLocator(page.locator('body'), ['div.form', { method: 'text', arg: 'Error', node: '*' }])
  * // page.locator('div.form').getByText(/Error/i)
+ *
+ * @example
+ * resolveCssLocator(page.locator('body'), 'li:@at(2)')
+ * // page.locator('li').nth(2)
  *
  * @example
  * resolveCssLocator(page.locator('body'), page.locator('existing'))
