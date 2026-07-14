@@ -170,6 +170,11 @@ Auto-attached to the page in the `PageRunner` constructor via `initNetworkListen
 | `focus(selector?)` / `blur(selector?)` | Focus/blur element | — |
 | `hover(selector?)` | Hover mouse over element | — |
 | `uploadFile(selector, files)` | Upload file(s) | — |
+| `scrollIntoViewIfNeeded(selector?, options?)` | Scroll element into view | — |
+| `dragTo(selector, target, options?)` | Drag an element to a target element | — |
+| `drop(selector, payload, options?)` | Drop data on an element | — |
+| `highlight(selector?)` | Highlight an element (Playwright debug feature) | — |
+| `highlightOff(selector?)` | Remove highlight from an element | — |
 
 ### Assertions
 
@@ -224,13 +229,16 @@ runner.hasUrl('**/page')        // any URL ending with /page
 
 | Method | Description |
 |--------|-------------|
-| `waitTime(ms?)` | Pause (default: 5000ms) |
+| `waitTime(ms?)` | Pause (default: 500ms) |
 | `pause()` | Playwright `page.pause()` (debug panel) |
 | `say(text)` | `console.log` during chain execution |
-| `where()` | Log current locator |
-| `fullPath()` | Log entire locator stack |
+| `sayWhere()` | Log current locator |
+| `sayFullPath()` | Log entire locator stack |
 | `act(func)` | Execute arbitrary user function as a step (receives `{runner, page}`) |
 | `run()` | **REQUIRED**: executes the entire chain, returns `Promise<PageRunner>` |
+| `then(onFulfilled?, onRejected?)` | Thenable interface; enables `await` on the runner instance directly |
+| `waitForRequestAfterTrigger(triggerFn, checkRequest)` | Trigger an action and wait for a specific network request |
+| `waitForFunction(callback)` | Wait for a function to return a truthy value (`page.waitForFunction`) |
 
 ### Fetch / API
 
@@ -490,8 +498,8 @@ test('Check login and registration forms', async ({page}) => {
     .expectText('Войти')
     .click('li:@text(Регистрация)')
     .expectText('Повторите пароль')
-    .where()
-    .fullPath()
+    .sayWhere()
+    .sayFullPath()
     .expectFetch('/json/m_authf/aj_get_info', {}, {status: 200})
     .act(async ({page}) => {
       await page.setViewportSize({width: 640, height: 640});

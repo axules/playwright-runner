@@ -43,11 +43,13 @@ class PageRunner {
   /**
    * Creates a new PageRunner instance (factory method).
    *
-   * @param {...any} args - Arguments forwarded to the constructor.
+   * @param {import("playwright").Page|import("playwright").Locator} initialLocator - Page or Locator to start from.
+   * @param {{ debug?: boolean }} [options={}] - Configuration options.
+   * @param {boolean} [options.debug=false] - Enables debug logging with timestamps.
    * @returns {PageRunner} A new PageRunner instance.
    */
-  static create(...args) {
-    return new this(...args);
+  static create(initialLocator, options) {
+    return new this(initialLocator, options);
   }
 
   /**
@@ -71,17 +73,12 @@ class PageRunner {
       const {
         debug = false
       } = options;
+      this._config = options;
       this.runCallerCounter = 0;
       this.locatorsWay = [locator];
       this._page = (0, _utils.getPage)(locator);
-      // initNetworkListener(this._page);
-
-      // this.targetTimeout = targetTimeout;
-      // this.updateShot = updateShot;
-      // this.screenshotTool = screenshotTool;
       this.actionsPull = [];
-      this.debug = debug || false;
-      if (this.debug) {
+      if (debug) {
         // eslint-disable-next-line no-console
         this.log = (...args) => console.log(new Date().toISOString().replace('T', ' ').slice(10, 23), ...args);
       }
@@ -136,7 +133,9 @@ class PageRunner {
    * @protected
    */
   _pushAction(caller, nextAction) {
-    if (!caller) throw new Error('Caller is undefined!');
+    if (!caller) {
+      throw new Error('Caller is undefined!');
+    }
     const initError = new Error(caller.name);
     Error.captureStackTrace(initError, caller);
     const nextMatcher = this._createMatcher(caller, nextAction, initError);
