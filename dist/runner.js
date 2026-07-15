@@ -238,6 +238,10 @@ class PageRunner {
     const parentLocator = (0, _lodash.default)(locatorOrSelector) && locatorOrSelector.startsWith('body') ? this.currentPage : this.currentLocator;
     return locatorOrSelector ? (0, _resolveCssLocator.resolveCssLocator)(parentLocator, locatorOrSelector) : parentLocator;
   }
+  findFirst(locatorOrSelector = undefined) {
+    const result = this.find(locatorOrSelector);
+    return (0, _utils.isPage)(result) ? result : result.first();
+  }
 
   /**
    * Internal helper: waits for the specified timeout in milliseconds.
@@ -606,7 +610,7 @@ class PageRunner {
    */
   click(selector = undefined, options = undefined) {
     return this._pushAction(this.click, async () => {
-      await this.find(selector).first().click(options);
+      await this.findFirst(selector).click(options);
     });
   }
 
@@ -619,7 +623,7 @@ class PageRunner {
    */
   doubleClick(selector = undefined, options = undefined) {
     return this._pushAction(this.doubleClick, async () => {
-      await this.find(selector).first().dblclick(options);
+      await this.findFirst(selector).dblclick(options);
     });
   }
 
@@ -633,7 +637,7 @@ class PageRunner {
    */
   fill(selector, text, options = undefined) {
     return this._pushAction(this.fill, async () => {
-      await this.find(selector).fill(text, options);
+      await this.findFirst(selector).fill(text, options);
     });
   }
 
@@ -650,7 +654,7 @@ class PageRunner {
       const form = this.find(parent);
       await (0, _utils.promiseFlow)(Object.entries(data).map(([name, value]) => async () => {
         const inputSelector = `[name="${name}"]`;
-        const field = await form.locator(inputSelector);
+        const field = await form.locator(inputSelector).first();
         if (value) {
           await field.fill(String(value));
         } else {
@@ -669,7 +673,7 @@ class PageRunner {
    * @protected
    */
   async _pressKey(key, element = undefined) {
-    const target = element && this.find(element);
+    const target = element && this.find(element).first();
     const {
       keyboard
     } = this.currentPage;
@@ -696,7 +700,7 @@ class PageRunner {
    * @returns {this} runner instance for further chaining.
    */
   pressEnter(element = undefined) {
-    return this._pushAction(this.pressKey, async () => {
+    return this._pushAction(this.pressEnter, async () => {
       await this._pressKey('Enter', element);
     });
   }
@@ -708,7 +712,7 @@ class PageRunner {
    * @returns {this} runner instance for further chaining.
    */
   pressEsc(element = undefined) {
-    return this._pushAction(this.pressKey, async () => {
+    return this._pushAction(this.pressEsc, async () => {
       await this._pressKey('Escape', element);
     });
   }
@@ -720,7 +724,7 @@ class PageRunner {
    * @returns {this} runner instance for further chaining.
    */
   pressTab(element = undefined) {
-    return this._pushAction(this.pressKey, async () => {
+    return this._pushAction(this.pressTab, async () => {
       await this._pressKey('Tab', element);
     });
   }
@@ -732,7 +736,7 @@ class PageRunner {
    * @returns {this} runner instance for further chaining.
    */
   pressSpace(element = undefined) {
-    return this._pushAction(this.pressKey, async () => {
+    return this._pushAction(this.pressSpace, async () => {
       await this._pressKey('Space', element);
     });
   }
