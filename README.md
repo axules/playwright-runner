@@ -39,11 +39,11 @@ Add to package.json:
 ## Quick Start
 
 ```js
-import { PageRunner } from '../src/runner';
-import { test } from '@playwright/test';
+import {PageRunner} from '../src/runner';
+import {test} from '@playwright/test';
 
-test('Test example', async ({ page }) => {
-  await PageRunner.create(page)
+test('Test example', async ({page}) => {
+  await PageRunner.new(page)
     .goto('https://example.com')
     .seeElement('h1')
     .expectText('Example Domain', 'h1');
@@ -234,11 +234,11 @@ Example: `"*hello*"` → `/^.*hello.*$/i`
 ### Basic test with assertions
 
 ```js
-import { test } from '@playwright/test';
-import { PageRunner } from '../src/runner';
+import {test} from '@playwright/test';
+import {PageRunner} from '../src/runner';
 
-test('Check login and registration forms', async ({ page }) => {
-  await PageRunner.create(page, { debug: true })
+test('Check login and registration forms', async ({page}) => {
+  await PageRunner.new(page, {debug: true})
     .goto('https://zapiski.online')
     .within('.cookiesNotification')
     .expectText('Мы используем cookies для работы сервиса. Продолжая пользоваться сервисом ЗапискиОнлайн, вы принимаете')
@@ -252,9 +252,9 @@ test('Check login and registration forms', async ({ page }) => {
     .expectText('Повторите пароль')
     .sayWhere()
     .sayFullPath()
-    .expectFetch('/json/m_authf/aj_get_info', {}, { status: 200 })
-    .act(async ({ page }) => {
-      await page.setViewportSize({ width: 640, height: 640 });
+    .expectFetch('/json/m_authf/aj_get_info', {}, {status: 200})
+    .act(async ({page}) => {
+      await page.setViewportSize({width: 640, height: 640});
     });
 });
 ```
@@ -262,9 +262,9 @@ test('Check login and registration forms', async ({ page }) => {
 ### Custom function with `act()`
 
 ```js
-await PageRunner.create(page)
+await PageRunner.new(page)
   .goto('https://example.com')
-  .act(async ({ runner, page }) => {
+  .act(async ({runner, page}) => {
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   })
   .seeElement('.footer');
@@ -273,7 +273,7 @@ await PageRunner.create(page)
 ### Screenshot matching
 
 ```js
-await PageRunner.create(page, {
+await PageRunner.new(page, {
   screenshotTool: screenshotTool('screenshots/my-test')
 })
   .goto('https://example.com')
@@ -283,11 +283,11 @@ await PageRunner.create(page, {
 ### Network request/response inspection
 
 ```js
-import { PageNetworkListener } from '../src/tools/PageNetworkListener'; // manual setup
+import {PageNetworkListener} from '../src/tools/PageNetworkListener'; // manual setup
 
-await PageRunner.create(page)
+await PageRunner.new(page)
   .goto('https://example.com')
-  .act(({ page }) => {
+  .act(({page}) => {
     page.networkListener = new PageNetworkListener(page); // attach listener
   })
   .listenNetwork()

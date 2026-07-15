@@ -40,15 +40,17 @@ function expectNetworkListenerIsActive(page) {
   return true;
 }
 class PageRunner {
+  /** @typedef {string|import("playwright").Locator} LocatorOrString */
   /**
-   * Creates a new PageRunner instance (factory method).
+   * Creates a new runner instance (factory method).
+   * When called on a subclass, returns an instance of that subclass.
    *
    * @param {import("playwright").Page|import("playwright").Locator} initialLocator - Page or Locator to start from.
    * @param {{ debug?: boolean }} [options={}] - Configuration options.
    * @param {boolean} [options.debug=false] - Enables debug logging with timestamps.
-   * @returns {PageRunner} A new PageRunner instance.
+   * @returns {new this}
    */
-  static create(initialLocator, options) {
+  static new(initialLocator, options) {
     return new this(initialLocator, options);
   }
 
@@ -75,7 +77,7 @@ class PageRunner {
       } = options;
       this._config = options;
       this.runCallerCounter = 0;
-      this.locatorsWay = [locator];
+      this._locatorsWay = [locator];
       this._page = (0, _utils.getPage)(locator);
       this.actionsPull = [];
       if (debug) {
@@ -128,9 +130,8 @@ class PageRunner {
    *
    * @param {Function} caller - Reference to the calling method (used for error context and logging).
    * @param {Function} nextAction - Async function implementing the step's logic.
-   * @returns {this} PageRunner instance for method chaining.
+   * @returns {this} runner instance for method chaining.
    * @throws {Error} If caller is not provided.
-   * @protected
    */
   _pushAction(caller, nextAction) {
     if (!caller) {
@@ -167,7 +168,7 @@ class PageRunner {
    * @returns {import("playwright").Locator}
    */
   get currentLocator() {
-    return this.locatorsWay[this.locatorsWay.length - 1];
+    return this._locatorsWay[this._locatorsWay.length - 1];
   }
 
   /**
@@ -193,7 +194,7 @@ class PageRunner {
    * Resolves a CSS selector string using the `:@method(arg)` syntax
    * against the current page.
    *
-   * @param {string} locator - CSS selector with optional `:@method(arg)` directives.
+   * @param {LocatorOrString} locator - CSS selector with optional `:@method(arg)` directives.
    * @returns {import("playwright").Locator}
    */
   resolveLocator(locator) {
@@ -213,7 +214,7 @@ class PageRunner {
    * plain CSS strings (with optional `:@method(arg)` directives), arrays of
    * mixed strings and custom method descriptors, or raw Playwright Locators.
    *
-   * @param {import("playwright").Locator|string|Array<string|{method: string, arg: string, node: string|null}>} [locatorOrSelector] -
+   * @param {LocatorOrString|Array<string|{method: string, arg: string, node: string|null}>} [locatorOrSelector] -
    *   Optional selector or Locator. Supports `:@method(arg)` syntax.
    * @returns {import("playwright").Locator} The resolved Playwright Locator,
    *   or the current locator if no selector is given.
@@ -252,7 +253,7 @@ class PageRunner {
   }
 
   /**
-   * Enables await on the PageRunner instance (Thenable interface).
+   * Enables await on the runner instance (Thenable interface).
    * Waits for all queued actions to finish before resolving.
    *
    * @param {Function} onFulfilled - Success callback.
@@ -274,11 +275,11 @@ class PageRunner {
   /**
    * Executes an arbitrary user function as a step in the chain.
    *
-   * @param {function({runner: PageRunner, page: import("playwright").Page, expect: import('@playwright/test').Expect}): (Promise<void>|void)} func -
+   * @param {function({runner: this, page: import('playwright').Page, expect: import('@playwright/test').Expect}): (Promise<void>|void)} func -
    *   Async or sync function receiving an object with `runner` and `page`.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    * @example
-   * await PageRunner.create(page)
+   * await PageRunner.new(page)
    *   .act(({ runner, page }) => {
    *     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
    *   })
@@ -298,7 +299,7 @@ class PageRunner {
    * Pauses execution and opens Playwright's built-in debug panel.
    * Useful for interactive debugging during test development.
    *
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   pause() {
     return this._pushAction(this.pause, async () => {
@@ -311,7 +312,7 @@ class PageRunner {
    * NOT recommended for production tests; prefer deterministic waits.
    *
    * @param {number} [timeout=500] - Timeout in milliseconds.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   waitTime(timeout = 500) {
     return this._pushAction(this.waitTime, async () => {
@@ -324,7 +325,8 @@ class PageRunner {
    *
    * @param {Function} triggerFn - Async function that triggers the request.
    * @param {Function|string|RegExp} checkRequest - Playwright-compatible request matcher.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
+   * @see https://playwright.dev/docs/api/class-page#page-wait-for-request
    */
   waitForRequestAfterTrigger(triggerFn, checkRequest) {
     return this._pushAction(this.waitForRequestAfterTrigger, async () => {
@@ -340,11 +342,11 @@ class PageRunner {
    * Delegates to Playwright's `page.waitForFunction`.
    *
    * @param {Function|string} callback - Function or string expression to evaluate.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
+   * @see https://playwright.dev/docs/api/class-page#page-wait-for-function
    */
   waitForFunction(callback) {
     return this._pushAction(this.waitForFunction, async () => {
-      // https://playwright.dev/docs/api/class-page#page-wait-for-function
       await this.waitForFunction(callback);
     });
   }
@@ -354,42 +356,46 @@ class PageRunner {
    * If stepsNumber exceeds the stack depth, resets to the initial locator.
    *
    * @param {number} [stepsNumber=1] - Number of steps to go back.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   withinBack(stepsNumber = 1) {
     return this._pushAction(this.withinBack, async () => {
-      if (stepsNumber >= this.locatorsWay.length) {
-        if (this.locatorsWay.length > 1) {
+      if (stepsNumber >= this._locatorsWay.length) {
+        if (this._locatorsWay.length > 1) {
           console.warn('withinBack :: not enough steps');
         }
-        this.locatorsWay = this.locatorsWay.slice(0, 1);
+        this._locatorsWay = this._locatorsWay.slice(0, 1);
       } else {
-        this.locatorsWay = this.locatorsWay.slice(0, this.locatorsWay.length - 1);
+        this._locatorsWay = this._locatorsWay.slice(0, this._locatorsWay.length - 1);
       }
     });
+  }
+  pushLocator(selector) {
+    this.log(this.currentLocator, '->', selector);
+    this._locatorsWay.push(this.resolveLocator(selector));
   }
 
   /**
    * Pushes a new locator onto the locator stack, scoping subsequent actions
    * to the element matched by the selector.
    *
-   * @param {string} selector - CSS selector (supports `:@method(arg)` syntax).
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} selector - CSS selector (supports `:@method(arg)` syntax).
+   * @returns {this} runner instance for further chaining.
    */
   within(selector) {
     return this._pushAction(this.within, async () => {
-      this.locatorsWay.push(this.resolveLocator(selector));
+      this.pushLocator(selector);
     });
   }
 
   /**
    * Switches the current locator context to the `body` element.
    *
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   withinBody() {
     return this._pushAction(this.withinBody, async () => {
-      this.locatorsWay.push(this.resolveLocator('body'));
+      this.pushLocator('body');
     });
   }
 
@@ -397,31 +403,30 @@ class PageRunner {
    * Pushes a new locator resolved as a child of the current locator.
    * Supports shorthand `|>` selector syntax via `find()`.
    *
-   * @param {string} selector - Child selector (supports shorthand syntax).
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} selector - Child selector (supports shorthand syntax).
+   * @returns {this} runner instance for further chaining.
    */
   withinChild(selector) {
     return this._pushAction(this.withinChild, async () => {
-      this.log(this.currentLocator, '->', selector);
-      this.locatorsWay.push(this.find(selector));
+      this.pushLocator(this.find(selector));
     });
   }
 
   /**
    * Resets the locator stack to the initial locator.
    *
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   withinInitial() {
     return this._pushAction(this.withinInitial, async () => {
-      this.locatorsWay = this.locatorsWay.slice(0, 1);
+      this._locatorsWay = this._locatorsWay.slice(0, 1);
     });
   }
 
   /**
    * Logs the current locator to the console (for debugging).
    *
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   sayWhere() {
     return this._pushAction(this.sayWhere, async () => {
@@ -433,20 +438,20 @@ class PageRunner {
   /**
    * Logs the full locator stack path to the console (for debugging).
    *
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   sayFullPath() {
     return this._pushAction(this.sayFullPath, async () => {
       // eslint-disable-next-line no-console
-      console.log(`I was here:\n${this.locatorsWay.join('\n')}`);
+      console.log(`I was here:\n${this._locatorsWay.join('\n')}`);
     });
   }
 
   /**
    * Asserts that an element is visible on the page.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   seeElement(selector = undefined) {
     return this._pushAction(this.seeElement, async () => {
@@ -457,8 +462,8 @@ class PageRunner {
   /**
    * Asserts that an element is hidden on the page.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   dontSeeElement(selector = undefined) {
     return this._pushAction(this.dontSeeElement, async () => {
@@ -470,8 +475,8 @@ class PageRunner {
    * Asserts that a set of elements has an expected count.
    *
    * @param {number} count - Expected number of matching elements.
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   expectElementsNumber(count, selector = undefined) {
     return this._pushAction(this.expectElementsNumber, async () => {
@@ -483,7 +488,7 @@ class PageRunner {
    * Asserts that an element is enabled.
    *
    * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   expectEnabled(selector = undefined) {
     return this._pushAction(this.expectEnabled, async () => {
@@ -494,8 +499,8 @@ class PageRunner {
   /**
    * Asserts that an element is disabled.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   expectDisabled(selector = undefined) {
     return this._pushAction(this.expectDisabled, async () => {
@@ -506,8 +511,8 @@ class PageRunner {
   /**
    * Asserts that an element is visible. Alias for `seeElement`.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   expectVisible(selector = undefined) {
     return this._pushAction(this.expectVisible, async () => {
@@ -519,7 +524,7 @@ class PageRunner {
    * Asserts that an element is hidden. Alias for `dontSeeElement`.
    *
    * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   expectHidden(selector = undefined) {
     return this._pushAction(this.expectHidden, async () => {
@@ -530,9 +535,9 @@ class PageRunner {
   /**
    * Asserts that an element has the expected CSS styles.
    *
-   * @param {Object<string, string>} styles - Map of CSS property names to expected values (e.g., `{ display: 'flex' }`).
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {Object} styles - Map of CSS property names to expected values (e.g., `{ display: 'flex' }`).
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   expectStyles(styles, selector = undefined) {
     return this._pushAction(this.expectStyles, async () => {
@@ -564,8 +569,8 @@ class PageRunner {
    * Asserts that an element has the expected attributes.
    *
    * @param {Object<string, string|RegExp>} attr - Map of attribute names to expected values.
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   expectAttributes(attr, selector = undefined) {
     return this._pushAction(this.expectAttributes, async () => {
@@ -595,23 +600,36 @@ class PageRunner {
   /**
    * Clicks an element.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @param {import("playwright").LocatorClickOptions} [options] - Playwright click options.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @param {Object} [options] - Playwright click options.
+   * @returns {this} runner instance for further chaining.
    */
   click(selector = undefined, options = undefined) {
     return this._pushAction(this.click, async () => {
-      await this.find(selector).click(options);
+      await this.find(selector).first().click(options);
+    });
+  }
+
+  /**
+   * Double-clicks an element.
+   *
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @param {Object} [options] - Playwright click options.
+   * @returns {this} runner instance for further chaining.
+   */
+  doubleClick(selector = undefined, options = undefined) {
+    return this._pushAction(this.doubleClick, async () => {
+      await this.find(selector).first().dblclick(options);
     });
   }
 
   /**
    * Fills an input field with the specified text.
    *
-   * @param {string} selector - CSS selector for the input element.
+   * @param {LocatorOrString} selector - CSS selector for the input element.
    * @param {string} text - Text to fill into the input.
-   * @param {import("playwright").LocatorFillOptions} [options] - Playwright fill options.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {Object} [options] - Playwright fill options.
+   * @returns {this} runner instance for further chaining.
    */
   fill(selector, text, options = undefined) {
     return this._pushAction(this.fill, async () => {
@@ -624,8 +642,8 @@ class PageRunner {
    * For each entry in data, finds the input by `[name="key"]` and fills or clears it.
    *
    * @param {Object<string, string|null>} data - Map of field names to values. Falsy values clear the field.
-   * @param {string} [parent] - Optional parent selector to scope the form fields.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [parent] - Optional parent selector to scope the form fields.
+   * @returns {this} runner instance for further chaining.
    */
   fillForm(data, parent) {
     return this._pushAction(this.fillForm, async () => {
@@ -662,8 +680,8 @@ class PageRunner {
    * Presses one or more keys on an optional target element or the page keyboard.
    *
    * @param {string|string[]} key - Key or array of keys to press sequentially.
-   * @param {string} [element] - Optional CSS selector for the target element.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [element] - Optional CSS selector for the target element.
+   * @returns {this} runner instance for further chaining.
    */
   pressKey(key, element = undefined) {
     return this._pushAction(this.pressKey, async () => {
@@ -674,8 +692,8 @@ class PageRunner {
   /**
    * Presses the Enter key on an optional target element or the page keyboard.
    *
-   * @param {string} [element] - Optional CSS selector for the target element.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [element] - Optional CSS selector for the target element.
+   * @returns {this} runner instance for further chaining.
    */
   pressEnter(element = undefined) {
     return this._pushAction(this.pressKey, async () => {
@@ -686,8 +704,8 @@ class PageRunner {
   /**
    * Presses the Escape key on an optional target element or the page keyboard.
    *
-   * @param {string} [element] - Optional CSS selector for the target element.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [element] - Optional CSS selector for the target element.
+   * @returns {this} runner instance for further chaining.
    */
   pressEsc(element = undefined) {
     return this._pushAction(this.pressKey, async () => {
@@ -698,8 +716,8 @@ class PageRunner {
   /**
    * Presses the Tab key on an optional target element or the page keyboard.
    *
-   * @param {string} [element] - Optional CSS selector for the target element.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [element] - Optional CSS selector for the target element.
+   * @returns {this} runner instance for further chaining.
    */
   pressTab(element = undefined) {
     return this._pushAction(this.pressKey, async () => {
@@ -710,8 +728,8 @@ class PageRunner {
   /**
    * Presses the Space key on an optional target element or the page keyboard.
    *
-   * @param {string} [element] - Optional CSS selector for the target element.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [element] - Optional CSS selector for the target element.
+   * @returns {this} runner instance for further chaining.
    */
   pressSpace(element = undefined) {
     return this._pushAction(this.pressKey, async () => {
@@ -723,8 +741,8 @@ class PageRunner {
    * Asserts that an element contains the expected text.
    *
    * @param {string|RegExp} text - Expected text content (or regex pattern).
-   * @param {string} [element] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [element] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   expectText(text, element = undefined) {
     return this._pushAction(this.expectText, async () => {
@@ -736,8 +754,8 @@ class PageRunner {
    * Asserts that an element has the exact expected text.
    *
    * @param {string|RegExp} text - Expected exact text content (or regex pattern).
-   * @param {string} [element] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [element] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   expectExactText(text, element = undefined) {
     return this._pushAction(this.expectExactText, async () => {
@@ -748,9 +766,9 @@ class PageRunner {
   /**
    * Asserts that an input field has the expected value.
    *
-   * @param {string} field - CSS selector for the input element.
+   * @param {LocatorOrString} field - CSS selector for the input element.
    * @param {string} value - Expected input value.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   expectValue(field, value) {
     return this._pushAction(this.expectValue, async () => {
@@ -767,7 +785,7 @@ class PageRunner {
    * Supports wildcard prefixes: `* /` matches same-origin paths, `** /` matches any URL ending with the path.
    *
    * @param {string|RegExp} urlOrPath - URL string, RegExp, or wildcard pattern (`* /path` or `** /path`).
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   hasUrl(urlOrPath) {
     return this._pushAction(this.hasUrl, async () => {
@@ -784,8 +802,8 @@ class PageRunner {
   /**
    * Asserts that the current page URL contains the expected query parameters.
    *
-   * @param {Object<string, string>} expectedParams - Map of query parameter names to expected values.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {Object} expectedParams - Map of query parameter names to expected values.
+   * @returns {this} runner instance for further chaining.
    */
   hasQueryParams(expectedParams) {
     return this._pushAction(this.hasQueryParams, async () => {
@@ -813,7 +831,7 @@ class PageRunner {
    * Logs a custom text message to the console during chain execution.
    *
    * @param {string} text - The message to display.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   say(text) {
     return this._pushAction(this.say, async () => {
@@ -828,8 +846,8 @@ class PageRunner {
    *
    * @param {string} url - The URL to navigate to.
    * @param {string} [waitForSelector] - Optional selector to wait for after navigation.
-   * @param {import("playwright").PageGotoOptions} [options] - Playwright goto options (merged with `{ waitUntil: 'load' }`).
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {Object} [options] - Playwright goto options (merged with `{ waitUntil: 'load' }`).
+   * @returns {this} runner instance for further chaining.
    */
   goto(url, waitForSelector = undefined, options = undefined) {
     return this._pushAction(this.goto, async () => {
@@ -848,8 +866,8 @@ class PageRunner {
    * Optionally waits for a selector to be visible after reload.
    *
    * @param {string} [waitForSelector] - Optional selector to wait for after reload.
-   * @param {import("playwright").PageReloadOptions} [options] - Playwright reload options.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {Object} [options] - Playwright reload options.
+   * @returns {this} runner instance for further chaining.
    */
   reloadPage(waitForSelector = undefined, options = undefined) {
     return this._pushAction(this.reloadPage, async () => {
@@ -869,8 +887,8 @@ class PageRunner {
   /**
    * Clears an input field.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   clear(selector = undefined) {
     return this._pushAction(this.clear, async () => {
@@ -881,9 +899,9 @@ class PageRunner {
   /**
    * Selects option values in a `<select>` element.
    *
-   * @param {string} selector - CSS selector for the `<select>` element.
-   * @param {string|string[]|import("playwright").SelectOptionValues} values - Value(s) to select.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} selector - CSS selector for the `<select>` element.
+   * @param {string|string[]|Object} values - Value(s) to select.
+   * @returns {this} runner instance for further chaining.
    */
   select(selector, values) {
     return this._pushAction(this.select, async () => {
@@ -894,8 +912,8 @@ class PageRunner {
   /**
    * Focuses on an element.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   focus(selector = undefined) {
     return this._pushAction(this.focus, async () => {
@@ -906,8 +924,8 @@ class PageRunner {
   /**
    * Removes focus from an element (blur).
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   blur(selector = undefined) {
     return this._pushAction(this.blur, async () => {
@@ -918,14 +936,14 @@ class PageRunner {
   /**
    * Drags an element to a target element.
    *
-   * @param {string} selector - CSS selector for the element to drag.
+   * @param {LocatorOrString} selector - CSS selector for the element to drag.
    * @param {string} target - CSS selector for the drop target.
-   * @param {import("playwright").LocatorDragToOptions} [options] - Playwright drag-to options.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {Object} [options] - Playwright drag-to options.
+   * @returns {this} runner instance for further chaining.
+   * @see https://playwright.dev/docs/api/class-locator#locator-drag-to
    */
   dragTo(selector, target, options = undefined) {
     return this._pushAction(this.dragTo, async () => {
-      // https://playwright.dev/docs/api/class-locator#locator-drag-to
       await this.find(selector || undefined).dragTo(this.find(target), options);
     });
   }
@@ -933,14 +951,14 @@ class PageRunner {
   /**
    * Performs a drop action on an element with the given payload.
    *
-   * @param {string} selector - CSS selector for the drop target element.
-   * @param {import("playwright").LocatorDropPayload} payload - Data to drop.
-   * @param {import("playwright").LocatorDropOptions} [options] - Playwright drop options.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} selector - CSS selector for the drop target element.
+   * @param {Object} payload - Data to drop.
+   * @param {Object} [options] - Playwright drop options.
+   * @returns {this} runner instance for further chaining.
+   * @see https://playwright.dev/docs/api/class-locator#locator-drop
    */
   drop(selector, payload, options = undefined) {
     return this._pushAction(this.drop, async () => {
-      // https://playwright.dev/docs/api/class-locator#locator-drop
       await this.find(selector || undefined).drop(payload, options);
     });
   }
@@ -948,8 +966,8 @@ class PageRunner {
   /**
    * Highlights an element in the browser (Playwright debug feature).
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   highlight(selector = undefined) {
     return this._pushAction(this.highlight, async () => {
@@ -961,8 +979,8 @@ class PageRunner {
   /**
    * Removes the highlight from an element.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   highlightOff(selector = undefined) {
     return this._pushAction(this.highlightOff, async () => {
@@ -974,8 +992,8 @@ class PageRunner {
   /**
    * Hovers over an element.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
    */
   hover(selector = undefined) {
     return this._pushAction(this.hover, async () => {
@@ -986,9 +1004,9 @@ class PageRunner {
   /**
    * Uploads file(s) to a file input element.
    *
-   * @param {string} selector - CSS selector for the file input element.
+   * @param {LocatorOrString} selector - CSS selector for the file input element.
    * @param {string|string[]} files - File path or array of file paths to upload.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   uploadFile(selector, files) {
     return this._pushAction(this.uploadFile, async () => {
@@ -999,9 +1017,9 @@ class PageRunner {
   /**
    * Scrolls an element into view if it is not already visible.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
-   * @param {import("playwright").LocatorScrollIntoViewIfNeededOptions} [options] - Playwright scroll options.
-   * @returns {this} PageRunner instance for further chaining.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @param {Object} [options] - Playwright scroll options.
+   * @returns {this} runner instance for further chaining.
    */
   scrollIntoViewIfNeeded(selector = undefined, options = undefined) {
     return this._pushAction(this.scrollIntoViewIfNeeded, async () => {
@@ -1012,9 +1030,9 @@ class PageRunner {
   /**
    * Takes a screenshot of the specified element and saves it.
    *
-   * @param {string} selector - CSS selector for the element to screenshot (required).
+   * @param {LocatorOrString} selector - CSS selector for the element to screenshot (required).
    * @param {string} name - Screenshot name / filename.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   saveShot(selector, name) {
     return this._pushAction(this.saveShot, async () => {
@@ -1032,7 +1050,7 @@ class PageRunner {
    * Takes a full-page screenshot and saves it.
    *
    * @param {string} name - Screenshot name / filename.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   savePageShot(name) {
     return this._pushAction(this.savePageShot, async () => {
@@ -1048,10 +1066,10 @@ class PageRunner {
    * Saves the screenshot if no reference exists, or if `saveCurrent` or `updateShot` is set.
    * Throws a ShotMatchError if pixel differences exceed the threshold.
    *
-   * @param {string} selector - CSS selector for the element (required if not using current locator).
+   * @param {LocatorOrString} selector - CSS selector for the element (required if not using current locator).
    * @param {string} name - Screenshot name / filename.
    * @param {boolean} [saveCurrent=false] - Force save the screenshot even if a reference exists.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    * @throws {ShotMatchError} If the screenshot does not match the reference.
    */
   matchShot(selector, name, saveCurrent = false) {
@@ -1088,7 +1106,7 @@ class PageRunner {
    * Starts recording network requests/responses for the current page.
    * Requires `page.networkListener` to be initialized.
    *
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   listenNetwork() {
     return this._pushAction(this.listenNetwork, async () => {
@@ -1101,7 +1119,7 @@ class PageRunner {
   /**
    * Stops recording network requests/responses.
    *
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   stopListenNetwork() {
     return this._pushAction(this.stopListenNetwork, async () => {
@@ -1116,10 +1134,9 @@ class PageRunner {
    * Must be called between `listenNetwork()` and `stopListenNetwork()`.
    *
    * @param {string|RegExp} url - URL or pattern to match.
-   * @param {function(import("playwright").Request): Promise<void>|void} matcher -
-   *   Async function that receives the matched Playwright Request object.
+   * @param {function(Request): Promise<void>|void} matcher - Async function that receives the matched Playwright Request object.
    * @param {number} [timeout=2000] - Timeout in milliseconds to wait for the request.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   matchRequest(url, matcher, timeout = 2000) {
     return this._pushAction(this.matchRequest, async () => {
@@ -1139,10 +1156,10 @@ class PageRunner {
    * Must be called between `listenNetwork()` and `stopListenNetwork()`.
    *
    * @param {string|RegExp} url - URL or pattern to match.
-   * @param {function(import("playwright").Response): Promise<void>|void} matcher -
+   * @param {function(Response): Promise<void>|void} matcher -
    *   Async function that receives the matched Playwright Response object.
    * @param {number} [timeout=10000] - Timeout in milliseconds to wait for the response.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   matchResponse(url, matcher, timeout = 10000) {
     return this._pushAction(this.matchResponse, async () => {
@@ -1191,7 +1208,7 @@ class PageRunner {
    * Makes an HTTP fetch request relative to the current page's origin.
    *
    * @param {string} url - URL (absolute, root-relative, or relative).
-   * @param {import("playwright").APIRequestContextOptions} [options={}] - Fetch options.
+   * @param {Object} [options={}] - Fetch options.
    * @returns {Promise<import("playwright").APIResponse>}
    */
   async fetch(url, options = {}) {
@@ -1204,10 +1221,10 @@ class PageRunner {
    * Fetches a URL and asserts the response status and/or body.
    *
    * @param {string} url - URL to fetch (absolute or relative).
-   * @param {import("playwright").APIRequestContextOptions} options - Fetch options.
+   * @param {Object} options - Fetch options.
    * @param {{ status?: number, data?: string|Object }} expected -
    *   Expected response: `{ status: 200, data: '...' }` or `{ status: 200, data: { ... } }`.
-   * @returns {this} PageRunner instance for further chaining.
+   * @returns {this} runner instance for further chaining.
    */
   expectFetch(url, options, expected) {
     return this._pushAction(this.expectFetch, async () => {

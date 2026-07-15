@@ -35,13 +35,13 @@
 ### Entry Point
 
 ```js
-import { PageRunner } from '../src/runner';
+import {PageRunner} from '../src/runner';
 
-PageRunner.create(page)                          // basic usage
+PageRunner.new(page)                          // basic usage
   .goto('https://example.com')
   .seeElement('h1');                              // auto-executes the chain
 
-PageRunner.create(page, { debug: true })         // with debug logging
+PageRunner.new(page, {debug: true})         // with debug logging
   .goto('https://example.com');
 ```
 
@@ -482,24 +482,24 @@ import {PageRunner} from '../src/runner';
 
 
 test('Check login and registration forms', async ({page}) => {
-  await PageRunner.create(page, {debug: true})
-    .goto('https://zapiski.online')
-    .within('.cookiesNotification')
-    .expectText('Мы используем cookies для работы сервиса. Продолжая пользоваться сервисом ЗапискиОнлайн, вы принимаете')
-    .click('button')
-    .dontSeeElement()
-    .reloadPage()
-    .dontSeeElement()
-    .within('#login_frame')
-    .expectText('Войти')
-    .click('li:@text(Регистрация)')
-    .expectText('Повторите пароль')
-    .sayWhere()
-    .sayFullPath()
-    .expectFetch('/json/m_authf/aj_get_info', {}, {status: 200})
-    .act(async ({page}) => {
-      await page.setViewportSize({width: 640, height: 640});
-    });
+   await PageRunner.new(page, {debug: true})
+     .goto('https://zapiski.online')
+     .within('.cookiesNotification')
+     .expectText('Мы используем cookies для работы сервиса. Продолжая пользоваться сервисом ЗапискиОнлайн, вы принимаете')
+     .click('button')
+     .dontSeeElement()
+     .reloadPage()
+     .dontSeeElement()
+     .within('#login_frame')
+     .expectText('Войти')
+     .click('li:@text(Регистрация)')
+     .expectText('Повторите пароль')
+     .sayWhere()
+     .sayFullPath()
+     .expectFetch('/json/m_authf/aj_get_info', {}, {status: 200})
+     .act(async ({page}) => {
+        await page.setViewportSize({width: 640, height: 640});
+     });
 });
 ```
 
@@ -532,29 +532,29 @@ test('Mobile and geolocation', async ({ page }) => {
 ### Custom screenshot tool + matchShot
 
 ```js
-import { test } from '@playwright/test';
-import { PageRunner } from '../src/runner';
-import { screenshotTool } from '../src/tools/takeScreenshot';
+import {test} from '@playwright/test';
+import {PageRunner} from '../src/runner';
+import {screenshotTool} from '../src/tools/takeScreenshot';
 
-test('match screenshot', async ({ page }) => {
-  await PageRunner.create(page, {
-    screenshotTool: screenshotTool('screenshots/my-test')
-  })
-    .goto('https://example.com')
-    .matchShot('h1', 'main-heading');
+test('match screenshot', async ({page}) => {
+   await PageRunner.new(page, {
+      screenshotTool: screenshotTool('screenshots/my-test')
+   })
+     .goto('https://example.com')
+     .matchShot('h1', 'main-heading');
 });
 ```
 
 ### Network request/response inspection
 
 ```js
-await PageRunner.create(page)
+await PageRunner.new(page)
   .goto('https://example.com')
   .listenNetwork()
   .click('"Отправить"')
   .matchResponse('/api/submit', async (response) => {
-    const data = await response.json();
-    expect(data.status).toBe('ok');
+     const data = await response.json();
+     expect(data.status).toBe('ok');
   })
   .stopListenNetwork();
 ```

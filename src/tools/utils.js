@@ -125,10 +125,7 @@ export function promiseFlow(list = []) {
   if (list.length === 0) return Promise.resolve();
   let point = Promise.resolve(typeof list[0] === 'function' ? list[0]() : list[0]);
   for (let i = 1; i < list.length; i++) {
-    if (typeof list[i] !== 'function') {
-      throw new Error(`promiseFlow - list[${i}] is not function`);
-    }
-    point = point.then(typeof list[i] === 'function' ? list[i] : () => list[0]);
+    point = point.then(typeof list[i] === 'function' ? list[i] : () => list[i]);
   }
   return point;
 }

@@ -36,11 +36,13 @@ export default defineConfig({
     ['list', { printSteps: true }],
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+  // https://playwright.dev/docs/test-use-options
   use: {
     headless: false,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     timezoneId: 'UTC',
+    locale: 'ru-RU',
     viewport: { width: 1500, height: 1000 },
 
     ignoreHTTPSErrors: true,

@@ -20,7 +20,7 @@
     "dist",
     "src",
     "examples",
-    "agents.md",
+    "AGENTS.md",
     "README.md"
   ],
   "devDependencies": {
