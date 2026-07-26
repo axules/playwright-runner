@@ -121,11 +121,11 @@ test('Test example', async ({page}) => {
 
 ```js
 // Full URL match
-runner.hasUrl('https://example.com/page')
+runner.expectUrl('https://example.com/page')
 
 // Relative path with wildcard
-runner.hasUrl('*/path')         // same origin + /path
-runner.hasUrl('**/page')        // any URL ending with /page
+runner.expectUrl('*/path')         // same origin + /path
+runner.expectUrl('**/page')        // any URL ending with /page
 ```
 
 ### Screenshots
@@ -363,6 +363,6 @@ playwright-runner/
 
 5. **`resolveLocator` chaining** — The `|>` separator creates a chain of locator queries. Each segment is resolved independently and applied sequentially on the parent locator.
 
-6. **`hasQueryParams`** — Uses `toHaveURL()` callback to validate query parameters.
+6. **`expectQueryParams`** — Uses `toHaveURL()` callback to validate query parameters.
 
 7. **Coding conventions:** camelCase variables/functions, PascalCase classes, ES modules (`import`/`export`), ESLint flat config v10.

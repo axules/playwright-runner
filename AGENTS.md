@@ -198,11 +198,11 @@ Auto-attached to the page in the `PageRunner` constructor via `initNetworkListen
 
 ```js
 // Full URL match
-runner.hasUrl('https://example.com/page')
+runner.expectUrl('https://example.com/page')
 
 // Relative path with wildcard
-runner.hasUrl('*/path')         // same origin + /path
-runner.hasUrl('**/page')        // any URL ending with /page
+runner.expectUrl('*/path')         // same origin + /path
+runner.expectUrl('**/page')        // any URL ending with /page
 ```
 
 ### Screenshots
@@ -457,7 +457,7 @@ This means errors bubble up with full context, making debugging easier without m
 
 5. **`resolveLocator` chaining** — The `|>` separator creates a chain of locator queries. Each segment is resolved independently and applied sequentially on the parent locator.
 
-6. **`hasQueryParams` is implemented** — The method uses `toHaveURL()` callback to validate query parameters. No longer throws.
+6. **`expectQueryParams` is implemented** — The method uses `toHaveURL()` callback to validate query parameters. No longer throws.
 
 7. **Negated assertion helpers removed** — `_disabled.not`, `_checked.not`, and `_has.not` no longer exist. Use `expectDisabled`, `dontSeeElement`, or standard Playwright assertions instead.
 

@@ -853,8 +853,8 @@ export class PageRunner {
    * @param {string|RegExp} urlOrPath - URL string, RegExp, or wildcard pattern (`* /path` or `** /path`).
    * @returns {this} runner instance for further chaining.
    */
-  hasUrl(urlOrPath) {
-    return this._pushAction(this.hasUrl, async () => {
+  expectUrl(urlOrPath) {
+    return this._pushAction(this.expectUrl, async () => {
       if (isString(urlOrPath) && urlOrPath.startsWith('*/')) {
         await expect(this.currentPage).toHaveURL(this.currentUrl.origin + urlOrPath.slice(1));
       } else if (isString(urlOrPath) && urlOrPath.startsWith('**/')) {
@@ -871,8 +871,8 @@ export class PageRunner {
    * @param {Object} expectedParams - Map of query parameter names to expected values.
    * @returns {this} runner instance for further chaining.
    */
-  hasQueryParams(expectedParams) {
-    return this._pushAction(this.hasQueryParams, async () => {
+  expectQueryParams(expectedParams) {
+    return this._pushAction(this.expectQueryParams, async () => {
       const errors = [];
       try {
         await expect(this.currentPage).toHaveURL((url) => {
