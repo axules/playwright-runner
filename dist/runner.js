@@ -793,6 +793,11 @@ class PageRunner {
       await (0, _test.expect)(this.find(element)).toContainText(text);
     });
   }
+  dontExpectText(text, element = undefined) {
+    return this._pushAction(this.dontExpectText, async () => {
+      await (0, _test.expect)(this.find(element)).not.toContainText(text);
+    });
+  }
 
   /**
    * Asserts that an element has the exact expected text.

@@ -21,5 +21,6 @@ test('Check login and registration forms', async ({ page }) => {
     .expectFetch('/json/m_authf/aj_get_info', {}, { status: 200 })
     .act(async ({ page }) => {
       await page.setViewportSize({ width: 640, height: 640 });
-    });
+    })
+    .dontExpectText('12345');
 });
