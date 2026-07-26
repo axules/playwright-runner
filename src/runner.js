@@ -19,6 +19,15 @@ import isString from 'lodash.isstring';
 
 /** @typedef {string|import("playwright").Locator} LocatorOrString */
 
+/**
+ * Asserts that a value is defined (not undefined).
+ * Throws a MatcherError with the given name label if undefined.
+ *
+ * @param {string} name - Label for the value in the error message.
+ * @param {*} received - The value to check.
+ * @returns {true}
+ * @throws {MatcherError} If received is undefined.
+ */
 function expectToBeDefined(name, received) {
   if (typeof received === 'undefined') {
     throw new MatcherError(`${toRedText(name)} Should be defined`, 'undefined', 'any');
@@ -26,6 +35,16 @@ function expectToBeDefined(name, received) {
   return true;
 }
 
+/**
+ * Asserts that a received value strictly equals an expected value.
+ * Throws a MatcherError with the given name label if they differ.
+ *
+ * @param {string} name - Label for the value in the error message.
+ * @param {*} received - The actual value.
+ * @param {*} expected - The expected value.
+ * @returns {true}
+ * @throws {MatcherError} If received !== expected.
+ */
 function expectToBe(name, received, expected) {
   if (received !== expected) {
     throw new MatcherError(toRedText(name), received, expected);
@@ -33,6 +52,13 @@ function expectToBe(name, received, expected) {
   return true;
 }
 
+/**
+ * Asserts that the page has a `networkListener` property initialized.
+ *
+ * @param {import("playwright").Page} page - The Playwright page to check.
+ * @returns {true}
+ * @throws {MatcherError} If page.networkListener is undefined.
+ */
 function expectNetworkListener(page) {
   if (!page.networkListener) {
     throw new MatcherError(
@@ -44,6 +70,13 @@ function expectNetworkListener(page) {
   return true;
 }
 
+/**
+ * Asserts that the page's network listener is active (recording).
+ *
+ * @param {import("playwright").Page} page - The Playwright page to check.
+ * @returns {true}
+ * @throws {MatcherError} If page.networkListener is not active.
+ */
 function expectNetworkListenerIsActive(page) {
   expectNetworkListener(page);
   if (!page.networkListener.active) {
@@ -95,9 +128,9 @@ export class PageRunner {
       const { debug = false } = options;
       this._config = options;
 
+      this._instanceId = crypto.randomUUID();
       this.runCallerCounter = 0;
       this._locatorsWay = [locator];
-      this._page = getPage(locator);
       this.actionsPull = [];
 
       if (debug) {
@@ -111,9 +144,23 @@ export class PageRunner {
       }
     };
 
+    this.clone = () => {
+      const cloned = new this.constructor(initialLocator, options);
+      cloned._locatorsWay = this._locatorsWay;
+      return new this.constructor(initialLocator, options);
+    };
+
     this.init();
     this.log('New runner created', locator, options);
   }
+
+  /**
+   * Creates a shallow clone of this runner instance.
+   * Shares the same locator stack but creates a fresh action queue.
+   *
+   * @returns {new this.constructor} A new runner instance with the same locator stack.
+   */
+  clone() {}
 
   /**
    * Wraps an action function with error enrichment and debug logging.
@@ -285,6 +332,14 @@ export class PageRunner {
     return locatorOrSelector ? resolveCssLocator(parentLocator, locatorOrSelector) : parentLocator;
   }
 
+  /**
+   * Resolves a selector and returns the first matching element.
+   * If the resolved locator is a Page or the selector is `'body'`,
+   * returns it as-is instead of calling `.first()`.
+   *
+   * @param {LocatorOrString} [locatorOrSelector] - Optional selector or Locator.
+   * @returns {import("playwright").Locator|import("playwright").Page} The first matching locator, or the page.
+   */
   findFirst(locatorOrSelector = undefined) {
     const result = this.find(locatorOrSelector);
     return isPage(result) || locatorOrSelector === 'body' ? result : result.first();
@@ -313,6 +368,7 @@ export class PageRunner {
    */
   async then(onFulfilled, onRejected) {
     try {
+      this.log('Actions in pull', this.actionsPull.length);
       if (this.actionsPull.length > 0) {
         await this.actionsPull[this.actionsPull.length - 1];
         this.log('Pull is finished');
@@ -340,7 +396,7 @@ export class PageRunner {
    */
   act(func) {
     return this._pushAction(this.act, async () => {
-      await func({ runner: this, page: this.currentPage, expect });
+      await func({ runner: this.clone(), page: this.currentPage, expect });
     });
   }
 
@@ -381,7 +437,7 @@ export class PageRunner {
     return this._pushAction(this.waitForRequestAfterTrigger, async () => {
       // https://playwright.dev/docs/api/class-page#page-wait-for-request
       const requestToWait = this.currentPage.waitForRequest(checkRequest);
-      await triggerFn({ runner: this, page: this.currentPage, waiter: requestToWait, expect });
+      await triggerFn({ runner: this.clone(), page: this.currentPage, waiter: requestToWait, expect });
       await requestToWait;
     });
   }
@@ -398,7 +454,7 @@ export class PageRunner {
     return this._pushAction(this.waitForResponseAfterTrigger, async () => {
       // https://playwright.dev/docs/api/class-page#page-wait-for-response
       const responseToWait = this.currentPage.waitForResponse(checkResponse);
-      await triggerFn({ runner: this, page: this.currentPage, waiter: responseToWait, expect });
+      await triggerFn({ runner: this.clone(), page: this.currentPage, waiter: responseToWait, expect });
       await responseToWait;
     });
   }
@@ -437,6 +493,12 @@ export class PageRunner {
     });
   }
 
+  /**
+   * Pushes a new locator onto the locator stack without awaiting.
+   * Used internally by `within*` methods.
+   *
+   * @param {LocatorOrString} selector - CSS selector (supports `:@method(arg)` syntax).
+   */
   pushLocator(selector) {
     this.log(this.currentLocator, '->', selector);
     this._locatorsWay.push(this.resolveLocator(selector));
@@ -818,6 +880,13 @@ export class PageRunner {
     });
   }
 
+  /**
+   * Asserts that an element does NOT contain the expected text.
+   *
+   * @param {string|RegExp} text - Text or pattern that should NOT be present.
+   * @param {LocatorOrString} [element] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
+   */
   dontExpectText(text, element = undefined) {
     return this._pushAction(this.dontExpectText, async () => {
       await expect(this.find(element)).not.toContainText(text);

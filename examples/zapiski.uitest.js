@@ -14,8 +14,10 @@ test('Check login and registration forms', async ({ page }) => {
     .dontSeeElement()
     .within('#login_frame')
     .expectText('Войти')
-    .click('li:@text(Регистрация)')
-    .expectText('Повторите пароль')
+    .act(async ({ runner }) => {
+      await runner.click('li:@text(Регистрация)');
+      await runner.expectText('Повторите пароль');
+    })
     .sayWhere()
     .sayFullPath()
     .expectFetch('/json/m_authf/aj_get_info', {}, { status: 200 })
