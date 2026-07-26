@@ -314,12 +314,14 @@ export class PageRunner {
   async then(onFulfilled, onRejected) {
     try {
       if (this.actionsPull.length > 0) {
-        await this.actionsPull[this.actionsPull.length - 1].catch();
+        await this.actionsPull[this.actionsPull.length - 1];
         this.log('Pull is finished');
       }
       onFulfilled();
     } catch (error) {
       onRejected(error);
+    } finally {
+      this.log('Fulfilled all actions');
     }
   }
 
