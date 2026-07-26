@@ -82,6 +82,7 @@ test('Test example', async ({page}) => {
 | `goto(url, waitForSelector?, timeout?)` | Navigate to URL (relative paths resolve against current origin) |
 | `reloadPage(waitForSelector?, timeout?)` | Reload current page |
 | `click(selector?, options?)` | Click element |
+| `doubleClick(selector?, options?)` | Double-click element |
 | `fill(selector, text, options?)` | Fill input field |
 | `fillForm(data, parent?)` | Fill form fields by `[name]` attribute; calls `fill` / `clear` per field |
 | `pressKey(key, selector?)` | Press key(s); accepts arrays for chaining |
@@ -139,7 +140,6 @@ runner.hasUrl('**/page')        // any URL ending with /page
 
 | Method | Description |
 |--------|-------------|
-| `waitForRequest({minCount?, timeout?})` | Wait until active requests <= minCount |
 | `listenNetwork()` | Start recording requests/responses (clears previous history) |
 | `stopListenNetwork()` | Stop recording |
 | `matchRequest(url, matcher, timeout?)` | Find request by URL pattern and assert |
@@ -157,6 +157,7 @@ runner.hasUrl('**/page')        // any URL ending with /page
 | `act(func)` | Execute arbitrary user function as a step (receives `{ runner, page }`) |
 | `then(onFulfilled?, onRejected?)` | Thenable interface; enables `await` on the runner instance directly |
 | `waitForRequestAfterTrigger(triggerFn, checkRequest)` | Trigger an action and wait for a specific network request |
+| `waitForResponseAfterTrigger(triggerFn, checkResponse)` | Trigger an action and wait for a specific network response |
 | `waitForFunction(callback)` | Wait for a function to return a truthy value (`page.waitForFunction`) |
 
 ### Fetch / API
@@ -171,9 +172,11 @@ runner.hasUrl('**/page')        // any URL ending with /page
 | Getter | Returns |
 |--------|---------|
 | `runner.currentLocator` | Current Playwright `Locator` |
+| `runner.initialLocator` | Initial Playwright `Locator` (first in stack) |
 | `runner.currentPage` | Playwright `Page` |
 | `runner.currentUrl` | `new URL(page.url())` |
 | `runner.find(selector?)` | Resolved locator (current or child via `resolveCssLocator`) |
+| `runner.resolveLocator(locator)` | Resolve CSS `:@method(arg)` selector against the page root |
 | `runner.apiContext` | Playwright `page.request` (APIRequestContext) |
 
 ---
@@ -282,14 +285,16 @@ await PageRunner.new(page, {
 
 ### Network request/response inspection
 
-```js
-import {PageNetworkListener} from '../src/tools/PageNetworkListener'; // manual setup
+Requires `page.networkListener` to be attached first:
 
-await PageRunner.new(page)
+```js
+import {PageNetworkListener} from '../src/tools/PageNetworkListener';
+
+const runner = PageRunner.new(page);
+runner.currentPage.networkListener = new PageNetworkListener(runner.currentPage);
+
+await runner
   .goto('https://example.com')
-  .act(({page}) => {
-    page.networkListener = new PageNetworkListener(page); // attach listener
-  })
   .listenNetwork()
   .click('"Отправить"')
   .matchResponse('/api/submit', async (response) => {
@@ -348,11 +353,11 @@ playwright-runner/
 
 ## Important Caveats
 
-1. **`page.networkListener`** — This property is **not** auto-attached by the `PageRunner` constructor. Attach manually if needed: `initNetworkListener(this._page)`.
+1. **`page.networkListener`** — Not auto-attached in the constructor. Attach manually before calling `listenNetwork()`: `page.networkListener = new PageNetworkListener(page)`.
 
 2. **All methods return `this`** — This enables chaining. Use `await` on the runner to resolve the promise.
 
-3. **`matchShot` behavior** — Screenshots are saved if: no reference file exists, `updateShot: true` (or `NODE_MODE=update` is set), or `saveCurrent` parameter is `true`. Otherwise they are compared using `diffImages` (pixelmatch), and a `ShotMatchError` is thrown on mismatch.
+3. **`matchShot` behavior** — Requires `runner.screenshotTool` to be set externally (e.g. via `screenshotTool(dir)` from `src/tools/takeScreenshot.js`). Screenshots are saved if: no reference file exists, `runner.updateShot` is set, or `saveCurrent` parameter is `true`. Otherwise they are compared using `diffImages` (pixelmatch), and a `ShotMatchError` is thrown on mismatch.
 
 4. **`fillForm` uses `fill` / `clear`** — Calls `fill(String(value))` or `clear()` per field (not triple-click).
 
