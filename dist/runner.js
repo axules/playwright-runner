@@ -253,7 +253,7 @@ class PageRunner {
   }
   findFirst(locatorOrSelector = undefined) {
     const result = this.find(locatorOrSelector);
-    return (0, _utils.isPage)(result) ? result : result.first();
+    return (0, _utils.isPage)(result) || locatorOrSelector === 'body' ? result : result.first();
   }
 
   /**

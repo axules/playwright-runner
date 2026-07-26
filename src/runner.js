@@ -287,7 +287,7 @@ export class PageRunner {
 
   findFirst(locatorOrSelector = undefined) {
     const result = this.find(locatorOrSelector);
-    return isPage(result) ? result : result.first();
+    return isPage(result) || locatorOrSelector === 'body' ? result : result.first();
   }
 
   /**
