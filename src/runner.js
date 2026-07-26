@@ -345,7 +345,7 @@ export class PageRunner {
    */
   findFirst(locatorOrSelector = undefined) {
     const result = this.find(locatorOrSelector);
-    return isPage(result) || locatorOrSelector === 'body' ? result : result.first();
+    return isPage(result) || locatorOrSelector === 'body' || !result.first ? result : result.first();
   }
 
   /**
@@ -387,7 +387,7 @@ export class PageRunner {
   /**
    * Executes an arbitrary user function as a step in the chain.
    *
-   * @param {function({runner: this, page: import('playwright').Page, expect: import('@playwright/test').Expect}): (Promise<void>|void)} func -
+   * @param {function({runner: this, page: import('playwright').Page, expect: import('@playwright/test').Expect}): (any)} func -
    *   Async or sync function receiving an object with `runner` and `page`.
    * @returns {this} runner instance for further chaining.
    * @example
