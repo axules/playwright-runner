@@ -17,6 +17,8 @@ import { resolveCssLocator } from './tools/resolveCssLocator';
 import isString from 'lodash.isstring';
 
 
+/** @typedef {string|import("playwright").Locator} LocatorOrString */
+
 function expectToBeDefined(name, received) {
   if (typeof received === 'undefined') {
     throw new MatcherError(`${toRedText(name)} Should be defined`, 'undefined', 'any');
@@ -55,7 +57,6 @@ function expectNetworkListenerIsActive(page) {
 }
 
 export class PageRunner {
-  /** @typedef {string|import("playwright").Locator} LocatorOrString */
   /**
    * Creates a new runner instance (factory method).
    * When called on a subclass, returns an instance of that subclass.
@@ -84,6 +85,9 @@ export class PageRunner {
   constructor(initialLocator, options = {}) {
     if (!initialLocator) {
       throw new Error('Initial locator should be defined');
+    }
+    if (!initialLocator.locator) {
+      throw new Error('Initial locator should be Page or Locator');
     }
     const locator = isPage(initialLocator) ? initialLocator.locator('html') : initialLocator;
 
@@ -200,6 +204,15 @@ export class PageRunner {
    */
   get currentLocator() {
     return this._locatorsWay[this._locatorsWay.length - 1];
+  }
+
+  /**
+   * Returns the initial Playwright Locator (first of the locator stack).
+   *
+   * @returns {import("playwright").Locator}
+   */
+  get initialLocator() {
+    return this._locatorsWay[0];
   }
 
   /**

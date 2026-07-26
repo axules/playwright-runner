@@ -14,6 +14,8 @@ var _utils = require("./tools/utils");
 var _resolveCssLocator = require("./tools/resolveCssLocator");
 var _lodash = _interopRequireDefault(require("lodash.isstring"));
 function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+/** @typedef {string|import("playwright").Locator} LocatorOrString */
+
 function expectToBeDefined(name, received) {
   if (typeof received === 'undefined') {
     throw new _MatcherError.default(`${(0, _makeExpectedError.toRedText)(name)} Should be defined`, 'undefined', 'any');
@@ -40,7 +42,6 @@ function expectNetworkListenerIsActive(page) {
   return true;
 }
 class PageRunner {
-  /** @typedef {string|import("playwright").Locator} LocatorOrString */
   /**
    * Creates a new runner instance (factory method).
    * When called on a subclass, returns an instance of that subclass.
@@ -69,6 +70,9 @@ class PageRunner {
   constructor(initialLocator, options = {}) {
     if (!initialLocator) {
       throw new Error('Initial locator should be defined');
+    }
+    if (!initialLocator.locator) {
+      throw new Error('Initial locator should be Page or Locator');
     }
     const locator = (0, _utils.isPage)(initialLocator) ? initialLocator.locator('html') : initialLocator;
     this.init = () => {
@@ -169,6 +173,15 @@ class PageRunner {
    */
   get currentLocator() {
     return this._locatorsWay[this._locatorsWay.length - 1];
+  }
+
+  /**
+   * Returns the initial Playwright Locator (first of the locator stack).
+   *
+   * @returns {import("playwright").Locator}
+   */
+  get initialLocator() {
+    return this._locatorsWay[0];
   }
 
   /**
