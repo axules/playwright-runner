@@ -349,7 +349,12 @@ class PageRunner {
     return this._pushAction(this.waitForRequestAfterTrigger, async () => {
       // https://playwright.dev/docs/api/class-page#page-wait-for-request
       const requestToWait = this.currentPage.waitForRequest(checkRequest);
-      await triggerFn();
+      await triggerFn({
+        runner: this,
+        page: this.currentPage,
+        waiter: requestToWait,
+        expect: _test.expect
+      });
       await requestToWait;
     });
   }
@@ -366,7 +371,12 @@ class PageRunner {
     return this._pushAction(this.waitForResponseAfterTrigger, async () => {
       // https://playwright.dev/docs/api/class-page#page-wait-for-response
       const responseToWait = this.currentPage.waitForResponse(checkResponse);
-      await triggerFn();
+      await triggerFn({
+        runner: this,
+        page: this.currentPage,
+        waiter: responseToWait,
+        expect: _test.expect
+      });
       await responseToWait;
     });
   }
