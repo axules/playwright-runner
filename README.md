@@ -147,18 +147,18 @@ runner.hasUrl('**/page')        // any URL ending with /page
 
 ### Utilities
 
-| Method | Description |
-|--------|-------------|
-| `waitTime(ms?)` | Pause (default: 500ms) |
-| `pause()` | Open Playwright debug panel (`page.pause()`) |
-| `say(text)` | Log text to console during chain execution |
-| `sayWhere()` | Log current locator |
-| `sayFullPath()` | Log entire locator stack |
-| `act(func)` | Execute arbitrary user function as a step (receives `{ runner, page }`) |
-| `then(onFulfilled?, onRejected?)` | Thenable interface; enables `await` on the runner instance directly |
-| `waitForRequestAfterTrigger(triggerFn, checkRequest)` | Trigger an action and wait for a specific network request |
-| `waitForResponseAfterTrigger(triggerFn, checkResponse)` | Trigger an action and wait for a specific network response |
-| `waitForFunction(callback)` | Wait for a function to return a truthy value (`page.waitForFunction`) |
+| Method                                                  | Description |
+|---------------------------------------------------------|-------------|
+| `waitTime(ms?)`                                         | Pause (default: 500ms) |
+| `pause()`                                               | Open Playwright debug panel (`page.pause()`) |
+| `say(text)`                                             | Log text to console during chain execution |
+| `sayWhere()`                                            | Log current locator |
+| `sayFullPath()`                                         | Log entire locator stack |
+| `act(func)`                                             | Execute arbitrary user function as a step (receives `{ runner, page }`) |
+| `then(onFulfilled?, onRejected?)`                       | Thenable interface; enables `await` on the runner instance directly |
+| `waitForRequestAfterTrigger(checkRequest, triggerFn)`   | Trigger an action and wait for a specific network request |
+| `waitForResponseAfterTrigger(checkResponse, triggerFn)` | Trigger an action and wait for a specific network response |
+| `waitForFunction(callback)`                             | Wait for a function to return a truthy value (`page.waitForFunction`) |
 
 ### Fetch / API
 

@@ -370,12 +370,12 @@ export class PageRunner {
   /**
    * Triggers an action, then waits for a specific network request to complete.
    *
-   * @param {Function} triggerFn - Async function that triggers the request.
    * @param {Function|string|RegExp} checkRequest - Playwright-compatible request matcher.
+   * @param {Function} triggerFn - Async function that triggers the request.
    * @returns {this} runner instance for further chaining.
    * @see https://playwright.dev/docs/api/class-page#page-wait-for-request
    */
-  waitForRequestAfterTrigger(triggerFn, checkRequest) {
+  waitForRequestAfterTrigger(checkRequest, triggerFn) {
     return this._pushAction(this.waitForRequestAfterTrigger, async () => {
       // https://playwright.dev/docs/api/class-page#page-wait-for-request
       const requestToWait = this.currentPage.waitForRequest(checkRequest);
@@ -387,12 +387,12 @@ export class PageRunner {
   /**
    * Triggers an action, then waits for a specific network request to complete.
    *
-   * @param {Function} triggerFn - Async function that triggers the response.
    * @param {Function|string|RegExp} checkResponse - Playwright-compatible response matcher.
+   * @param {Function} triggerFn - Async function that triggers the response.
    * @returns {this} runner instance for further chaining.
    * @see https://playwright.dev/docs/api/class-page#page-wait-for-response
    */
-  waitForResponseAfterTrigger(triggerFn, checkResponse) {
+  waitForResponseAfterTrigger(checkResponse, triggerFn) {
     return this._pushAction(this.waitForResponseAfterTrigger, async () => {
       // https://playwright.dev/docs/api/class-page#page-wait-for-response
       const responseToWait = this.currentPage.waitForResponse(checkResponse);
