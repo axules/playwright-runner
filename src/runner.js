@@ -226,10 +226,9 @@ export class PageRunner {
     const nextMatcher = this._createMatcher(caller, nextAction, initError);
     if (this.actionsPull.length > 0) {
       const last = this.actionsPull[this.actionsPull.length - 1];
-      // this.actionsPull.push(last.then(() => Promise.resolve(nextAction())));
-      this.actionsPull.push(last.then(nextMatcher));
+      this.actionsPull.push(last.then((payload) => nextMatcher({ payload, runner: this })));
     } else {
-      this.actionsPull.push(Promise.resolve(nextMatcher()));
+      this.actionsPull.push(Promise.resolve(nextMatcher({ payload: undefined, runner: this })));
     }
 
     return this;
@@ -374,13 +373,11 @@ export class PageRunner {
       this.log('Actions in pull', this.actionsPull.length);
       if (this.actionsPull.length > 0) {
         await this.actionsPull[this.actionsPull.length - 1];
-        this.log('Pull is finished');
       }
       onFulfilled();
+      this.log('Pull is finished');
     } catch (error) {
       onRejected(error);
-    } finally {
-      this.log('Fulfilled all actions');
     }
   }
 
