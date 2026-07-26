@@ -145,9 +145,9 @@ export class PageRunner {
     };
 
     this.clone = () => {
-      const cloned = new this.constructor(initialLocator, options);
+      const cloned = new this.constructor(this.initialLocator, options);
       cloned._locatorsWay = this._locatorsWay;
-      return new this.constructor(initialLocator, options);
+      return cloned;
     };
 
     this.init();
