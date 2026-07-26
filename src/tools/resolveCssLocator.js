@@ -239,7 +239,7 @@ export function resolveCssLocator(parent, selector) {
   }
   return resolveCssQuery(selector)
     .reduce((R, [method, ...args]) => {
-      if (!R) {
+      if (!R[method]) {
         throw new Error(`Unrecognized method [${method}] for ${String(R)}`);
       }
       return R[method](...args);
