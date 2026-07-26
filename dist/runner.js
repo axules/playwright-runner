@@ -165,6 +165,9 @@ class PageRunner {
         return await action(...args);
       } catch (error) {
         this.log(`Action ${counter} [`, caller.name, '] failed');
+        if (this._config.debug) {
+          console.error(error);
+        }
         error.stack = initError.stack;
         error.message = ['', `Method: ${initError.message}`, `Current locator: ${this.currentLocator}`, 'Message:', error.message, error.stack].join('\n');
         throw error;
