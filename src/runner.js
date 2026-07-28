@@ -740,6 +740,20 @@ export class PageRunner {
   }
 
   /**
+   * Clicks an element identified by its visible text content.
+   * Uses the `*:@text(text)` selector syntax to find the element.
+   *
+   * @param {string} text - The visible text content of the element to click.
+   * @param {Object} [options] - Playwright click options.
+   * @returns {this} runner instance for further chaining.
+   */
+  clickContent(text, options = undefined) {
+    return this._pushAction(this.click, async () => {
+      await this.findFirst(this.find(`*:@text(${text})`)).click(options);
+    });
+  }
+
+  /**
    * Double-clicks an element.
    *
    * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.

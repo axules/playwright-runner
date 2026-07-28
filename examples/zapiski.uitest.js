@@ -14,6 +14,7 @@ test('Check login and registration forms', async ({ page }) => {
     .dontSeeElement()
     .within('#login_frame')
     .expectText('Войти')
+    .clickContent('Войти')
     .act(async ({ runner }) => {
       await runner.click('li:@text(Регистрация)');
       await runner.expectText('Повторите пароль');
