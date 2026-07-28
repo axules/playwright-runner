@@ -748,7 +748,7 @@ export class PageRunner {
    * @returns {this} runner instance for further chaining.
    */
   clickContent(text, options = undefined) {
-    return this._pushAction(this.click, async () => {
+    return this._pushAction(this.clickContent, async () => {
       await this.findFirst(this.find(`*:@text(${text})`)).click(options);
     });
   }
