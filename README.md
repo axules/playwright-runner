@@ -143,24 +143,24 @@ These methods **push** onto an internal locator stack; they never replace it. Us
 
 ### Assertions
 
-| Method                                   | Description                                   | Playwright Equivalent         |
-|------------------------------------------|-----------------------------------------------|-------------------------------|
-| `seeElement(selector?)`                  | Element is visible                            | `toBeVisible()`               |
-| `dontSeeElement(selector?)`              | Element is hidden                             | `toBeHidden()`                |
-| `expectVisible(selector?)`               | Element is visible (alias of `seeElement`)    | `toBeVisible()`               |
-| `expectHidden(selector?)`                | Element is hidden (alias of `dontSeeElement`) | `toBeHidden()`                |
-| `expectText(text, selector?)`            | Locator contains text                         | `toContainText()`             |
-| `dontExpectText(text, selector?)`        | Locator does not contain text                 | `not.toContainText()`         |
-| `expectExactText(text, selector?)`       | Locator has exactly this text                 | `toHaveText()`                |
-| `expectEnabled(selector?)`               | Element is enabled                            | `toBeEnabled()`               |
-| `expectDisabled(selector?)`              | Element is disabled                           | `toBeDisabled()`              |
-| `expectValue(selector, value)`           | Input has the given value                     | `toHaveValue()`               |
-| `expectStyles(styles, selector?)`        | Check CSS styles (`{ display: 'flex' }`)      | `toHaveCSS()` per entry       |
-| `expectAttributes(attr, selector?)`      | Check attributes (`{ href: '/path' }`)        | `toHaveAttribute()` per entry |
-| `expectElementsNumber(count, selector?)` | Check the number of matching elements         | `toHaveCount()`               |
-| `expectUrl(urlOrPath)`                   | Check the current page URL                    | `toHaveURL()`                 |
-| `expectQueryParams(expectedParams)`      | Check URL query parameters                    | `toHaveURL()` callback        |
-| `expectFetch(url, options, expected)`    | Fetch and assert status / body                | Custom                        |
+| Method                                   | Description                                     | Playwright Equivalent         |
+|------------------------------------------|-------------------------------------------------|-------------------------------|
+| `seeElement(selector?)`                  | Element is visible                              | `toBeVisible()`               |
+| `dontSeeElement(selector?)`              | Element is hidden                               | `toBeHidden()`                |
+| `expectVisible(selector?)`               | Element is visible (alias of `seeElement`)      | `toBeVisible()`               |
+| `expectHidden(selector?)`                | Element is hidden (alias of `dontSeeElement`)   | `toBeHidden()`                |
+| `expectText(text, selector?)`            | Locator contains text                           | `toContainText()`             |
+| `dontExpectText(text, selector?)`        | Locator does not contain text                   | `not.toContainText()`         |
+| `expectExactText(text, selector?)`       | Locator has exactly this text                   | `toHaveText()`                |
+| `expectEnabled(selector?)`               | Element is enabled                              | `toBeEnabled()`               |
+| `expectDisabled(selector?)`              | Element is disabled                             | `toBeDisabled()`              |
+| `expectValue(selector, value)`           | Input has the given value                       | `toHaveValue()`               |
+| `expectStyles(styles, selector?)`        | Check CSS styles (`{ display: 'flex' }`)        | `toHaveCSS()` per entry       |
+| `expectAttributes(attr, selector?)`      | Check attributes (`{ href: '/path' }`)          | `toHaveAttribute()` per entry |
+| `expectElementsNumber(count, selector?)` | Check the number of matching elements           | `toHaveCount()`               |
+| `expectUrl(urlOrPath)`                   | Check the current page URL                      | `toHaveURL()`                 |
+| `expectQueryParams(expectedParams)`      | Check URL query parameters                      | `toHaveURL()` callback        |
+| `expectFetch(url, options, expected)`    | Fetch, then assert status / body / partial body | `number`, function, or object |
 
 **`expectUrl()` usage:**
 
@@ -183,6 +183,21 @@ runner.expectUrl(/example\.com/)
 ```js
 runner.expectQueryParams({ page: 2, sort: 'date' })
 ```
+
+**`expectFetch(expected)` usage:**
+
+`expected` can be:
+
+| Form                                         | Description                                                                        |
+|----------------------------------------------|------------------------------------------------------------------------------------|
+| `200`                                        | Assert the HTTP status code                                                        |
+| `(response) => { ... }`                      | Custom assertion callback, receives the raw `APIResponse`                          |
+| `{ status: 200 }`                            | Assert the HTTP status code                                                        |
+| `{ status: 200, data: 'body text' }`         | Status + exact string body (`toBe`)                                                |
+| `{ status: 200, data: { ok: true } }`        | Status + deep-equal JSON body (`toEqual`)                                          |
+| `{ containsData: { ok: true } }`             | Status + partial JSON match (`toMatchObject`)                                      |
+| `{ containsData: [1, 2] }`                   | Status + array subset check (`arrayContaining`, only for JSON responses)           |
+| `{ check: (response) => { ... } }`           | Custom async assertion callback, receives the raw `APIResponse`                    |
 
 ### Screenshots
 
@@ -228,12 +243,17 @@ Network matchers require `page.networkListener` (a `PageNetworkListener`) attach
 | `fetch(url, options?)`                | `apiContext.fetch()` resolved against the page origin. Returns `Promise<APIResponse>` (not chainable) |
 | `expectFetch(url, options, expected)` | Fetch and assert the response. Chainable                                                              |
 
-`expected` shape:
+`expected` accepts a status number, a function, or an object:
 
 ```
+200                                          // status code only
+(response) => { ... }                        // custom assertion callback
 { status: 200 }                              // status check
-{ status: 200, data: 'body text' }           // status + exact text (string)
-{ status: 200, data: { ok: true } }          // status + deep-equal JSON
+{ status: 200, data: 'body text' }           // status + exact text (toBe)
+{ status: 200, data: { ok: true } }          // status + deep-equal JSON (toEqual)
+{ containsData: { ok: true } }               // partial JSON match (toMatchObject)
+{ containsData: [1, 2] }                     // array subset check (arrayContaining)
+{ check: (res) => { ... } }                  // custom callback on the raw APIResponse
 ```
 
 URL resolution in `fetch` / `expectFetch`:
