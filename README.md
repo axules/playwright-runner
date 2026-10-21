@@ -4,6 +4,34 @@
 
 ---
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [API Reference](#api-reference)
+  - [Entry Point](#entry-point)
+  - [DOM Navigation](#dom-navigation)
+  - [Actions](#actions)
+  - [Assertions](#assertions)
+  - [Screenshots](#screenshots)
+  - [Network](#network)
+  - [Utilities](#utilities)
+  - [Fetch / API](#fetch--api)
+  - [Getters](#getters)
+- [Selector Syntax](#selector-syntax)
+  - [CSS `:@method(arg)` Syntax](#css-methodarg-syntax)
+  - [`|>` Shorthand](#chain-shorthand-is-not-available-in-pagerunner)
+- [Examples](#examples)
+  - [Basic test with assertions](#basic-test-with-assertions)
+  - [Custom function with `act()`](#custom-function-with-act)
+  - [Screenshot matching](#screenshot-matching)
+  - [Network request/response inspection](#network-requestresponse-inspection)
+- [Scripts](#scripts)
+- [Important Caveats](#important-caveats)
+
+---
+
 ## Overview
 
 **Playwright Runner** provides a lightweight, declarative wrapper around Playwright with a **fluent chainable API**. Each method call represents a single test step; steps are auto-executed as the chain is built.
@@ -258,7 +286,7 @@ The runner understands one selector dialect: CSS with `:@method(arg)` directives
 **Wildcard `*` behavior:** for `text`, `label`, `role`, `placeholder` and `title`, `*` becomes `.*` in a case-insensitive, fully anchored RegExp.  
 Examples: `div:@text("*hello*")` → `/^.*hello.*$/i`, `:edit*` → `/^edit.*$/i`.
 
-### `|>` Shorthand — not available in `PageRunner`
+### Chain shorthand is not available in PageRunner
 
 [`resolveLocator.js`](src/tools/resolveLocator.js) also exports a `|>` shorthand parser (`resolveText`, `resolveQueryPiece`, `resolveQuery`, `resolveLocator`). It is used internally by [`RunnerLocator`](src/tools/RunnerLocator.js) for programmatic selector building, **not** by `PageRunner` methods — no `runner.*` selector parameter routes through it.
 
