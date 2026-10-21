@@ -10,13 +10,13 @@
 
 ### Why?
 
-| Problem | Solution |
-|---------|----------|
-| Playwright's native API is verbose for sequential steps | Fluent interface (method chaining) |
-| Managing async execution order is manual | Automatic Promise queue serialization via `this.actionsPull` |
-| Unclear assertion error messages | Custom `MatcherError` with colored Expected/Received |
-| Screenshot diffing requires boilerplate | Built-in `matchShot` with pixelmatch integration |
-| Debugging test steps is cumbersome | Built-in debug logging via `debug: true` option |
+| Problem                                                 | Solution                                                     |
+|---------------------------------------------------------|--------------------------------------------------------------|
+| Playwright's native API is verbose for sequential steps | Fluent interface (method chaining)                           |
+| Managing async execution order is manual                | Automatic Promise queue serialization via `this.actionsPull` |
+| Unclear assertion error messages                        | Custom `MatcherError` with colored Expected/Received         |
+| Screenshot diffing requires boilerplate                 | Built-in `matchShot` with pixelmatch integration             |
+| Debugging test steps is cumbersome                      | Built-in debug logging via `debug: true` option              |
 
 ---
 
@@ -24,8 +24,16 @@
 
 Add to package.json:
 
-```json
+```
 "playwright-runner": "github:axules/playwright-runner#master",
+```
+
+The package ships both `dist/` (transpiled, referenced by `main` / `exports`) and `src/`:
+
+```js
+import { PageRunner } from 'playwright-runner';        // dist/runner.js
+import { PageRunner } from 'playwright-runner/runner'; // same entry
+import { PageRunner } from '../src/runner';            // local checkout
 ```
 
 ### Dependencies
@@ -39,196 +47,236 @@ Add to package.json:
 ## Quick Start
 
 ```js
-import {PageRunner} from '../src/runner';
-import {test} from '@playwright/test';
+import { test } from '@playwright/test';
 
-test('Test example', async ({page}) => {
+import { PageRunner } from '../src/runner';
+
+test('Test example', async ({ page }) => {
   await PageRunner.new(page)
     .goto('https://example.com')
     .seeElement('h1')
     .expectText('Example Domain', 'h1');
 });
 ```
+
 ---
 
 ## API Reference
 
 ### Entry Point
 
-| Method | Description |
-|--------|-------------|
-| `PageRunner.create(pageOrLocator, config?)` | Create a new runner instance. Accepts a Playwright `Page` or `Locator`. |
+| Method                                   | Description                                                                                                   |
+|------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| `PageRunner.new(pageOrLocator, config?)` | Create a new runner instance. Accepts a Playwright `Page` (wrapped as `page.locator('html')`) or a `Locator`. |
+| `new PageRunner(pageOrLocator, config?)` | Same as above, called as a constructor.                                                                       |
 
 **Config options:**
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
+| Option  | Type      | Default | Description                   |
+|---------|-----------|---------|-------------------------------|
 | `debug` | `boolean` | `false` | Logs each step with timestamp |
 
 ### DOM Navigation
 
-| Method | Description |
-|--------|-------------|
-| `within(selector)` | Switch context to `page.locator(selector)` |
-| `withinChild(selector)` | Switch to `currentLocator.locator(selector)` |
-| `withinBody()` | Reset to `body` locator |
-| `withinInitial()` | Return to initial locator (pops entire stack) |
-| `withinBack(steps?)` | Go back N steps in locator stack |
+These methods **push** onto an internal locator stack; they never replace it. Use `withinBack` / `withinInitial` to pop.
+
+| Method                     | Description                                                                                                     |
+|----------------------------|-----------------------------------------------------------------------------------------------------------------|
+| `within(selector)`         | Push `currentLocator.locator(selector)` (resolved via `resolveLocator`)                                         |
+| `withinChild(selector)`    | Push a child of the current locator, resolved via `find(selector)`                                              |
+| `withinBody()`             | Push the `body` locator                                                                                         |
+| `withinInitial()`          | Drop the whole stack, returning to the initial locator                                                          |
+| `withinBack(stepsNumber?)` | Pop the top locator (default `1` step); falls back to the initial locator and warns if the stack is too shallow |
+| `pushLocator(selector)`    | Push a locator onto the stack immediately (not queued)                                                          |
 
 ### Actions
 
-| Method | Description |
-|--------|-------------|
-| `goto(url, waitForSelector?, timeout?)` | Navigate to URL (relative paths resolve against current origin) |
-| `reloadPage(waitForSelector?, timeout?)` | Reload current page |
-| `click(selector?, options?)` | Click element |
-| `doubleClick(selector?, options?)` | Double-click element |
-| `fill(selector, text, options?)` | Fill input field |
-| `fillForm(data, parent?)` | Fill form fields by `[name]` attribute; calls `fill` / `clear` per field |
-| `pressKey(key, selector?)` | Press key(s); accepts arrays for chaining |
-| `pressEnter(selector?)` / `pressEsc(selector?)` / `pressTab(selector?)` / `pressSpace(selector?)` | Convenience shortcuts for common keys |
-| `select(selector, values)` | Select `<option>` values |
-| `clear(selector?)` | Clear input field |
-| `focus(selector?)` / `blur(selector?)` | Focus / blur element |
-| `hover(selector?)` | Hover mouse over element |
-| `uploadFile(selector, files)` | Upload file(s) |
-| `scrollIntoViewIfNeeded(selector?, options?)` | Scroll element into view |
-| `dragTo(selector, target, options?)` | Drag an element to a target element |
-| `drop(selector, payload, options?)` | Drop data on an element |
-| `highlight(selector?)` | Highlight an element (Playwright debug feature) |
-| `highlightOff(selector?)` | Remove highlight from an element |
+| Method                                                                                        | Description                                                                                                                                                   |
+|-----------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `goto(url, waitForSelector?, options?)`                                                       | Navigate to URL, then optionally wait for `waitForSelector` to be visible. `options` are Playwright `page.goto` options (merged over `{ waitUntil: 'load' }`) |
+| `reloadPage(waitForSelector?, options?)`                                                      | Reload the page, then optionally wait for `waitForSelector`. `options` are Playwright `page.reload` options                                                   |
+| `click(selector?, options?)`                                                                  | Click the first matching element                                                                                                                              |
+| `clickContent(text, options?)`                                                                | Click the first element whose text matches `text` (uses `*:@text(...)`)                                                                                       |
+| `doubleClick(selector?, options?)`                                                            | Double-click the first matching element                                                                                                                       |
+| `fill(selector, text, options?)`                                                              | Fill an input field                                                                                                                                           |
+| `fillForm(data, parent?)`                                                                     | Fill fields by `[name]` attribute, scoped to `find(parent)` (current locator by default). Truthy values use `fill(String(value))`, falsy values use `clear()` |
+| `pressKey(key, element?)`                                                                     | Press key(s) on `find(element).first()` or the page keyboard. `key` may be an array, pressed sequentially                                                     |
+| `pressEnter(element?)` / `pressEsc(element?)` / `pressTab(element?)` / `pressSpace(element?)` | Convenience shortcuts for common keys                                                                                                                         |
+| `select(selector, values)`                                                                    | Select `<option>` value(s) (`selectOption`)                                                                                                                   |
+| `clear(selector?)`                                                                            | Clear an input field                                                                                                                                          |
+| `focus(selector?)` / `blur(selector?)`                                                        | Focus / blur an element                                                                                                                                       |
+| `hover(selector?)`                                                                            | Hover the mouse over an element                                                                                                                               |
+| `uploadFile(selector, files)`                                                                 | Upload file(s) via `setInputFiles`                                                                                                                            |
+| `scrollIntoViewIfNeeded(selector?, options?)`                                                 | Scroll an element into view                                                                                                                                   |
+| `dragTo(selector, target, options?)`                                                          | Drag an element onto `find(target)`                                                                                                                           |
+| `drop(selector, payload, options?)`                                                           | Drop `payload` on an element                                                                                                                                  |
+| `highlight(selector?)`                                                                        | Highlight an element (Playwright debug feature)                                                                                                               |
+| `highlightOff(selector?)`                                                                     | Remove the highlight (`hideHighlight`)                                                                                                                        |
 
 ### Assertions
 
-| Method | Description | Playwright Equivalent |
-|--------|-------------|----------------------|
-| `seeElement(selector?)` | Element is visible | `toBeVisible()` |
-| `dontSeeElement(selector?)` | Element is hidden | `toBeHidden()` |
-| `expectVisible(selector?)` | Element is visible | `toBeVisible()` |
-| `expectHidden(selector?)` | Element is hidden | `toBeHidden()` |
-| `expectText(text, selector?)` | Locator contains text | `toContainText()` |
-| `expectExactText(text, selector?)` | Locator has exact text | `toHaveText()` |
-| `expectEnabled(selector?)` | Element is enabled | `toBeEnabled()` |
-| `expectDisabled(selector?)` | Element is disabled | `toBeDisabled()` |
-| `expectValue(selector, value)` | Check input value | `toHaveValue()` |
-| `expectStyles(styles, selector?)` | Check CSS styles (`{ display: 'flex' }`) | `toHaveCSS()` |
-| `expectAttributes(attr, selector?)` | Check element attributes (`{ href: '/path' }`) | `toHaveAttribute()` |
-| `expectElementsNumber(count, selector?)` | Check element count | `toHaveCount()` |
-| `hasUrl(urlOrPath)` | Check current URL (supports `*` / `**` wildcards) | `toHaveURL()` |
-| `hasQueryParams(expectedParams)` | Check URL query parameters | `toHaveURL()` callback |
+| Method                                   | Description                                   | Playwright Equivalent         |
+|------------------------------------------|-----------------------------------------------|-------------------------------|
+| `seeElement(selector?)`                  | Element is visible                            | `toBeVisible()`               |
+| `dontSeeElement(selector?)`              | Element is hidden                             | `toBeHidden()`                |
+| `expectVisible(selector?)`               | Element is visible (alias of `seeElement`)    | `toBeVisible()`               |
+| `expectHidden(selector?)`                | Element is hidden (alias of `dontSeeElement`) | `toBeHidden()`                |
+| `expectText(text, selector?)`            | Locator contains text                         | `toContainText()`             |
+| `dontExpectText(text, selector?)`        | Locator does not contain text                 | `not.toContainText()`         |
+| `expectExactText(text, selector?)`       | Locator has exactly this text                 | `toHaveText()`                |
+| `expectEnabled(selector?)`               | Element is enabled                            | `toBeEnabled()`               |
+| `expectDisabled(selector?)`              | Element is disabled                           | `toBeDisabled()`              |
+| `expectValue(selector, value)`           | Input has the given value                     | `toHaveValue()`               |
+| `expectStyles(styles, selector?)`        | Check CSS styles (`{ display: 'flex' }`)      | `toHaveCSS()` per entry       |
+| `expectAttributes(attr, selector?)`      | Check attributes (`{ href: '/path' }`)        | `toHaveAttribute()` per entry |
+| `expectElementsNumber(count, selector?)` | Check the number of matching elements         | `toHaveCount()`               |
+| `expectUrl(urlOrPath)`                   | Check the current page URL                    | `toHaveURL()`                 |
+| `expectQueryParams(expectedParams)`      | Check URL query parameters                    | `toHaveURL()` callback        |
+| `expectFetch(url, options, expected)`    | Fetch and assert status / body                | Custom                        |
 
-**`hasUrl()` usage:**
+**`expectUrl()` usage:**
 
 ```js
 // Full URL match
 runner.expectUrl('https://example.com/page')
 
-// Relative path with wildcard
-runner.expectUrl('*/path')         // same origin + /path
-runner.expectUrl('**/page')        // any URL ending with /page
+// Same origin + path
+runner.expectUrl('*/path')
+
+// Any URL ending with /path
+runner.expectUrl('**/path')
+
+// RegExp is passed to Playwright as-is
+runner.expectUrl(/example\.com/)
+```
+
+**`expectQueryParams()` usage:**
+
+```js
+runner.expectQueryParams({ page: 2, sort: 'date' })
 ```
 
 ### Screenshots
 
-| Method | Description |
-|--------|-------------|
-| `saveShot(selector, name)` | Save element screenshot (both params required) |
-| `savePageShot(name)` | Save full page screenshot |
-| `matchShot(selector?, name, saveCurrent?)` | Compare with reference; saves if missing or `updateShot: true` |
+`saveShot`, `savePageShot` and `matchShot` require `runner.screenshotTool` to be set (see [Screenshot matching](#screenshot-matching)).
+
+| Method                                    | Description                                                                                                                                                                         |
+|-------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `saveShot(selector, name)`                | Save an element screenshot. Falls back to the current locator if `selector` is omitted, but throws if neither is available                                                          |
+| `savePageShot(name)`                      | Save a full-page screenshot                                                                                                                                                         |
+| `matchShot(selector, name, saveCurrent?)` | Compare with the reference. Saves if the reference is missing, `saveCurrent` is `true`, or `runner.updateShot` is set; otherwise diffs via `diffImages` and throws `ShotMatchError` |
 
 ### Network
 
-| Method | Description |
-|--------|-------------|
-| `listenNetwork()` | Start recording requests/responses (clears previous history) |
-| `stopListenNetwork()` | Stop recording |
-| `matchRequest(url, matcher, timeout?)` | Find request by URL pattern and assert |
-| `matchResponse(url, matcher, timeout?)` | Find response by URL pattern and assert |
+Network matchers require `page.networkListener` (a `PageNetworkListener`) attached manually — see [Network request/response inspection](#network-requestresponse-inspection).
+
+| Method                                  | Description                                                                                        |
+|-----------------------------------------|----------------------------------------------------------------------------------------------------|
+| `listenNetwork()`                       | Start recording requests, clearing previous history                                                |
+| `stopListenNetwork()`                   | Stop recording                                                                                     |
+| `matchRequest(url, matcher, timeout?)`  | Pass the last matching request to `matcher`. Checks synchronously — it does not poll for `timeout` |
+| `matchResponse(url, matcher, timeout?)` | Pass the last matching finished request's response to `matcher`. Also synchronous                  |
 
 ### Utilities
 
-| Method                                                  | Description |
-|---------------------------------------------------------|-------------|
-| `waitTime(ms?)`                                         | Pause (default: 500ms) |
-| `pause()`                                               | Open Playwright debug panel (`page.pause()`) |
-| `say(text)`                                             | Log text to console during chain execution |
-| `sayWhere()`                                            | Log current locator |
-| `sayFullPath()`                                         | Log entire locator stack |
-| `act(func)`                                             | Execute arbitrary user function as a step (receives `{ runner, page }`) |
-| `then(onFulfilled?, onRejected?)`                       | Thenable interface; enables `await` on the runner instance directly |
-| `waitForRequestAfterTrigger(checkRequest, triggerFn)`   | Trigger an action and wait for a specific network request |
-| `waitForResponseAfterTrigger(checkResponse, triggerFn)` | Trigger an action and wait for a specific network response |
-| `waitForFunction(callback)`                             | Wait for a function to return a truthy value (`page.waitForFunction`) |
+| Method                                                  | Description                                                                                                   |
+|---------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| `waitTime(ms?)`                                         | Pause (default `500`ms)                                                                                       |
+| `pause()`                                               | Open the Playwright debug panel (`page.pause()`)                                                              |
+| `say(text)`                                             | Log text to the console during chain execution                                                                |
+| `sayWhere()`                                            | Log the current locator                                                                                       |
+| `sayFullPath()`                                         | Log the entire locator stack                                                                                  |
+| `act(func)`                                             | Run a function as a step. Receives `{ runner, page, expect }` (`runner` is a clone sharing the locator stack) |
+| `then(onFulfilled?, onRejected?)`                       | Thenable interface; lets you `await` the runner instance                                                      |
+| `waitForRequestAfterTrigger(checkRequest, triggerFn)`   | Call `triggerFn({ runner, page, waiter, expect })`, then await the matching request                           |
+| `waitForResponseAfterTrigger(checkResponse, triggerFn)` | Same as above for a response                                                                                  |
+| `waitForFunction(callback)`                             | Wait until `callback` (evaluated in the page) returns a truthy value                                          |
+| `clone()`                                               | Shallow clone sharing the locator stack but with a fresh action queue                                         |
 
 ### Fetch / API
 
-| Method | Description |
-|--------|-------------|
-| `fetch(url, options?)` | Make HTTP request relative to current page origin |
-| `expectFetch(url, options, expected)` | Fetch and assert response status/data |
+| Method                                | Description                                                                                           |
+|---------------------------------------|-------------------------------------------------------------------------------------------------------|
+| `fetch(url, options?)`                | `apiContext.fetch()` resolved against the page origin. Returns `Promise<APIResponse>` (not chainable) |
+| `expectFetch(url, options, expected)` | Fetch and assert the response. Chainable                                                              |
+
+`expected` shape:
+
+```
+{ status: 200 }                              // status check
+{ status: 200, data: 'body text' }           // status + exact text (string)
+{ status: 200, data: { ok: true } }          // status + deep-equal JSON
+```
+
+URL resolution in `fetch` / `expectFetch`:
+
+| Input               | Resolved to                               |
+|---------------------|-------------------------------------------|
+| `https://host/path` | as-is                                     |
+| `/path`             | `currentOrigin.replace(path)`             |
+| `path`              | `${currentOrigin}${currentPathname}/path` |
 
 ### Getters
 
-| Getter | Returns |
-|--------|---------|
-| `runner.currentLocator` | Current Playwright `Locator` |
-| `runner.initialLocator` | Initial Playwright `Locator` (first in stack) |
-| `runner.currentPage` | Playwright `Page` |
-| `runner.currentUrl` | `new URL(page.url())` |
-| `runner.find(selector?)` | Resolved locator (current or child via `resolveCssLocator`) |
-| `runner.resolveLocator(locator)` | Resolve CSS `:@method(arg)` selector against the page root |
-| `runner.apiContext` | Playwright `page.request` (APIRequestContext) |
+| Getter                           | Returns                                                                                                                                                             |
+|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `runner.currentLocator`          | Current Playwright `Locator` (top of the stack)                                                                                                                     |
+| `runner.initialLocator`          | Initial Playwright `Locator` (first in the stack)                                                                                                                   |
+| `runner.currentPage`             | Playwright `Page` extracted from the current locator                                                                                                                |
+| `runner.currentUrl`              | `new URL(page.url())`                                                                                                                                               |
+| `runner.find(selector?)`         | Resolved `Locator`. No argument → current locator; a selector starting with `body` → resolved from the page root; anything else → resolved from the current locator |
+| `runner.findFirst(selector?)`    | Same as `find()`, then `.first()` (unless it is a Page or `'body'`)                                                                                                 |
+| `runner.resolveLocator(locator)` | Rewrites the current locator to `resolveCssLocator(currentPage, locator)`. Note: despite the name, this does **not** support the `\|>` shorthand                    |
+| `runner.apiContext`              | Playwright `page.request` (APIRequestContext)                                                                                                                       |
 
 ---
 
 ## Selector Syntax
 
+The runner understands one selector dialect: CSS with `:@method(arg)` directives, parsed by [`resolveCssLocator`](src/tools/resolveCssLocator.js). Every selector taking method (`within`, `find`, `click`, `expectText`, …) supports it.
+
+`selector` parameters also accept a raw Playwright `Locator`, or an array mixing CSS strings and `{ method, arg, node }` descriptors.
+
 ### CSS `:@method(arg)` Syntax
 
-Custom directives embedded in CSS selectors for more expressive queries. Parsed by [`resolveCssLocator`](src/tools/resolveCssLocator.js).
+| Shorthand                                     | Resolves To                                          | Example                                  |
+|-----------------------------------------------|------------------------------------------------------|------------------------------------------|
+| `div:@text(Submit)`                           | `locator('div').filter({ hasText: 'Submit' })`       | Filter by text (no node)                 |
+| `*:@text(Submit)`                             | `getByText('Submit')`                                | Find child by text (with node)           |
+| `div:*@text(Submit)` / `div >*:@text(Submit)` | `locator('div').getByText('Submit')`                 | Node prefix makes `:@text` a `getByText` |
+| `div:@role(button)`                           | `locator('div').getByRole('button')`                 | Match by ARIA role                       |
+| `form:@label(email)`                          | `locator('form').getByLabel('email')`                | Match by label                           |
+| `input:@placeholder(Enter name)`              | `locator('input').getByPlaceholder('Enter name')`    | Match by placeholder                     |
+| `a:@title(Click here)`                        | `locator('a').getByTitle('Click here')`              | Match by title                           |
+| `div:@text("Submit (123)")`                   | `locator('div').filter({ hasText: 'Submit (123)' })` | Quoted arg with parentheses              |
+| `li:@at(2)`                                   | `locator('li').nth(2)`                               | Select nth element (zero-based)          |
+| `li:@first()`                                 | `locator('li').first()`                              | Select the first element                 |
+| `li:@last()`                                  | `locator('li').last()`                               | Select the last element                  |
 
-| Shorthand | Resolves To | Example |
-|-----------|-------------|---------|
-| `div:@text(Submit)` | `locator('div').filter({ hasText: 'Submit' })` | Filter by text (no node) |
-| `*:@text(Submit)` | `getByText('Submit')` | Find child by text (with node) |
-| `div:@role(button)` | `locator('div').getByRole('button')` | Match by ARIA role |
-| `form:@label(email)` | `locator('form').getByLabel('email')` | Match by label |
-| `input:@placeholder(Enter name)` | `locator('input').getByPlaceholder('Enter name')` | Match by placeholder |
-| `a:@title(Click here)` | `locator('a').getByTitle('Click here')` | Match by title |
-| `div:@text("Submit (123)")` | `locator('div').filter({ hasText: 'Submit (123)' })` | Quoted arg with parentheses |
-| `div >*:@text(Content)` | `locator('div').getByText('Content')` | Node prefix `>*` for `getByText` |
-| `li:@at(index)` | `locator('li').nth(index)` | Select nth element by index (zero-based) |
-| `li:@first()` | `locator('li').first()` | Select the first element |
-| `li:@last()` | `locator('li').last()` | Select the last element |
+`:@` directives can be chained on the same selector (`div:@text(Submit):@role(button)`), and method names are case-insensitive. A directive without a preceding selector and without a `*` node (e.g. `` ` :@text(x)` ``) throws.
 
-**Wildcard `*` behavior:** In `text`, `label`, `role`, `placeholder`, and `title` methods, `*` is converted to a regex (`.*`) with case-insensitive flag.  
-Example: `div:@text("*hello*")` → `locator('div').filter({ hasText: /^.*hello.*$/i })`
+**Wildcard `*` behavior:** for `text`, `label`, `role`, `placeholder` and `title`, `*` becomes `.*` in a case-insensitive, fully anchored RegExp.  
+Examples: `div:@text("*hello*")` → `/^.*hello.*$/i`, `:edit*` → `/^edit.*$/i`.
 
-### Shorthand `|>` Syntax
+### `|>` Shorthand — not available in `PageRunner`
 
-A compact shorthand syntax parsed by [`resolveLocator`](src/tools/resolveLocator.js) for writing readable locator chains. Use `|>` to chain multiple queries.
+[`resolveLocator.js`](src/tools/resolveLocator.js) also exports a `|>` shorthand parser (`resolveText`, `resolveQueryPiece`, `resolveQuery`, `resolveLocator`). It is used internally by [`RunnerLocator`](src/tools/RunnerLocator.js) for programmatic selector building, **not** by `PageRunner` methods — no `runner.*` selector parameter routes through it.
 
-| Shorthand | Resolves To | Example |
-|-----------|-------------|---------|
-| `button` | `locator('button')` | CSS/tag selector (default) |
-| `:"Текст"` | `getByText('Текст')` | Exact text match |
-| `:"*текст*"` | `getByText(/текст/i)` | Case-insensitive substring |
-| `"Текст"` | `filter({ hasText: 'Текст' })` | Filter by text (alias, without colon) |
-| `:button"Кнопка"` | `getByRole('button', { name: 'Кнопка' })` | Role + accessible name |
-| `:button"*кнопк*"` | `getByRole('button', { name: /кнопк/i })` | Role + regex name |
-| `:~метка` | `getByLabel('метка')` | By `aria-label` or associated `<label>` |
-| `:~*метк*` | `getByLabel(/метк/i)` | Label with regex |
+If you use the tools directly:
 
-**Chaining with `|>`:**
+| Shorthand           | Resolves To                                          |
+|---------------------|------------------------------------------------------|
+| `button`            | `locator('button')`                                  |
+| `:"Текст"`          | `getByText('Текст')`                                 |
+| `"Текст"`           | `filter({ hasText: 'Текст' })` (alias without colon) |
+| `:~метка`           | `getByLabel('метка')`                                |
+| `:button"Кнопка"`   | `getByRole('button', { name: 'Кнопка' })`            |
+| `*` in any text arg | `/^.*текст.*$/i` (case-insensitive)                  |
 
+```js
+resolveLocator(page.locator('body'), 'div.form |> :button"Сохранить"')
+// → locator('body').locator('div.form').getByRole('button', { name: 'Сохранить' })
 ```
-div.form |> :button"Сохранить"
-// 1. locator('div.form')
-// 2. .getByRole('button', { name: 'Сохранить' })
-```
-
-**Wildcard `*` behavior:** In text/role/label queries, `*` is converted to a regex (`.*`) with case-insensitive flag.  
-Example: `"*hello*"` → `/^.*hello.*$/i`
 
 ---
 
@@ -236,12 +284,15 @@ Example: `"*hello*"` → `/^.*hello.*$/i`
 
 ### Basic test with assertions
 
-```js
-import {test} from '@playwright/test';
-import {PageRunner} from '../src/runner';
+Taken from [`examples/zapiski.uitest.js`](examples/zapiski.uitest.js):
 
-test('Check login and registration forms', async ({page}) => {
-  await PageRunner.new(page, {debug: true})
+```js
+import { test } from '@playwright/test';
+
+import { PageRunner } from '../src/runner';
+
+test('Check login and registration forms', async ({ page }) => {
+  await PageRunner.new(page, { debug: true })
     .goto('https://zapiski.online')
     .within('.cookiesNotification')
     .expectText('Мы используем cookies для работы сервиса. Продолжая пользоваться сервисом ЗапискиОнлайн, вы принимаете')
@@ -251,44 +302,57 @@ test('Check login and registration forms', async ({page}) => {
     .dontSeeElement()
     .within('#login_frame')
     .expectText('Войти')
-    .click('li:@text(Регистрация)')
-    .expectText('Повторите пароль')
+    .clickContent('Войти')
+    .act(async ({ runner }) => {
+      await runner.click('li:@text(Регистрация)');
+      await runner.expectText('Повторите пароль');
+    })
     .sayWhere()
     .sayFullPath()
-    .expectFetch('/json/m_authf/aj_get_info', {}, {status: 200})
-    .act(async ({page}) => {
-      await page.setViewportSize({width: 640, height: 640});
-    });
+    .expectFetch('/json/m_authf/aj_get_info', {}, { status: 200 })
+    .act(async ({ page }) => {
+      await page.setViewportSize({ width: 640, height: 640 });
+    })
+    .dontExpectText('12345');
 });
 ```
 
 ### Custom function with `act()`
 
+`act` receives a cloned runner sharing the same locator stack, so you can keep chaining inside it:
+
 ```js
 await PageRunner.new(page)
   .goto('https://example.com')
-  .act(async ({runner, page}) => {
+  .act(async ({ page, expect }) => {
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect(page.locator('.footer')).toBeVisible();
   })
   .seeElement('.footer');
 ```
 
 ### Screenshot matching
 
+`matchShot` needs `screenshotTool` from [`src/tools/takeScreenshot.js`](src/tools/takeScreenshot.js):
+
 ```js
-await PageRunner.new(page, {
-  screenshotTool: screenshotTool('screenshots/my-test')
-})
+import { screenshotTool } from '../src/tools/takeScreenshot';
+
+const runner = PageRunner.new(page);
+runner.screenshotTool = screenshotTool('screenshots/my-test');
+
+await runner
   .goto('https://example.com')
-  .matchShot('h1', 'main-heading');
+  .matchShot('h1', 'main-heading')
+  .savePageShot('full-page');
 ```
 
 ### Network request/response inspection
 
-Requires `page.networkListener` to be attached first:
+The runner does not attach a network listener; do it yourself after the page exists:
 
 ```js
-import {PageNetworkListener} from '../src/tools/PageNetworkListener';
+import { PageNetworkListener } from '../src/tools/PageNetworkListener';
 
 const runner = PageRunner.new(page);
 runner.currentPage.networkListener = new PageNetworkListener(runner.currentPage);
@@ -296,7 +360,7 @@ runner.currentPage.networkListener = new PageNetworkListener(runner.currentPage)
 await runner
   .goto('https://example.com')
   .listenNetwork()
-  .click('"Отправить"')
+  .click('button:@text(Отправить)')
   .matchResponse('/api/submit', async (response) => {
     const data = await response.json();
     expect(data.status).toBe('ok');
@@ -308,61 +372,24 @@ await runner
 
 ## Scripts
 
-| Script | Command | Description |
-|--------|---------|-------------|
-| `test` | `jest` | Run unit tests |
-| `example` | `npx playwright test` | Run E2E tests |
-| `report` | `npx playwright show-report` | Open Playwright HTML report |
-| `build` | `babel --delete-dir-on-start -d dist src --ignore **/*.test.js` | Transpile source to `dist/` |
+| Script    | Command                                                         | Description                     |
+|-----------|-----------------------------------------------------------------|---------------------------------|
+| `test`    | `jest`                                                          | Run unit tests                  |
+| `example` | `npx playwright test`                                           | Run E2E tests                   |
+| `report`  | `npx playwright show-report`                                    | Open the Playwright HTML report |
+| `build`   | `babel --delete-dir-on-start -d dist src --ignore **/*.test.js` | Transpile `src/` to `dist/`     |
 
----
-
-## Project Structure
-
-```
-playwright-runner/
-├── src/
-│   ├── runner.js                  # 🔥 Core PageRunner class
-│   └── tools/
-│       ├── createDirDeep.js       # Recursive directory creation
-│       ├── diffImages.js          # Screenshot diff (pixelmatch)
-│       ├── makeExpectedError.js   # Colored error formatting (red/green)
-│       ├── MatcherError.js        # Custom assertion error class
-│       ├── PageNetworkListener.js # Network request/response monitoring
-│       ├── resolveCssLocator.js   # CSS @method(arg) selector parser
-│       ├── resolveLocator.js      # Shorthand |> selector parser
-│       ├── RunnerLocator.js       # Programmatic locator builder class
-│       ├── screenshotReporter.js  # Legacy Jasmine screenshot reporter
-│       ├── ShotMatchError.js      # Screenshot mismatch error
-│       ├── takeScreenshot.js      # Screenshot utility with URL overlay
-│       ├── utils.js               # Shared utilities (selectors, styles, attrs)
-│       └── tests/                 # Unit tests for tools
-│           ├── resolveCssLocator.test.js
-│           └── resolveLocator.test.js
-├── examples/                      # E2E test examples
-├── dist/                          # Built output (Babel)
-├── playwright.config.js           # Playwright configuration
-├── jest.config.js                 # Jest configuration
-├── babel.config.js                # Babel configuration
-├── eslint.config.js               # ESLint flat config (v10)
-├── agents.md                      # AI-Optimized Context spec
-└── package.json
-```
+Update reference screenshots with `cross-env NODE_MODE=update npx playwright test`.
 
 ---
 
 ## Important Caveats
 
-1. **`page.networkListener`** — Not auto-attached in the constructor. Attach manually before calling `listenNetwork()`: `page.networkListener = new PageNetworkListener(page)`.
-
-2. **All methods return `this`** — This enables chaining. Use `await` on the runner to resolve the promise.
-
-3. **`matchShot` behavior** — Requires `runner.screenshotTool` to be set externally (e.g. via `screenshotTool(dir)` from `src/tools/takeScreenshot.js`). Screenshots are saved if: no reference file exists, `runner.updateShot` is set, or `saveCurrent` parameter is `true`. Otherwise they are compared using `diffImages` (pixelmatch), and a `ShotMatchError` is thrown on mismatch.
-
-4. **`fillForm` uses `fill` / `clear`** — Calls `fill(String(value))` or `clear()` per field (not triple-click).
-
-5. **`resolveLocator` chaining** — The `|>` separator creates a chain of locator queries. Each segment is resolved independently and applied sequentially on the parent locator.
-
-6. **`expectQueryParams`** — Uses `toHaveURL()` callback to validate query parameters.
-
-7. **Coding conventions:** camelCase variables/functions, PascalCase classes, ES modules (`import`/`export`), ESLint flat config v10.
+1. **`page.networkListener`** — Not attached automatically. Create it before calling `listenNetwork()`: `page.networkListener = new PageNetworkListener(page)`.
+2. **Most methods return `this`** — That is what enables chaining. Getters (`currentLocator`, `find()`, `currentPage`, …) return locators, and `fetch()` returns a `Promise<APIResponse>`.
+3. **`matchShot` requires `screenshotTool`** — Set `runner.screenshotTool` (e.g. `screenshotTool(dir)`). It is also used by `saveShot` / `savePageShot`. `updateShot` is read from the runner at call time.
+4. **`fillForm` uses `fill` / `clear`** — Truthy values go through `fill(String(value))`, falsy values through `clear()`.
+5. **`matchRequest` / `matchResponse` do not wait** — They inspect already-recorded requests and throw a `MatcherError` immediately if nothing matches. The `timeout` argument only affects the error message.
+6. **`expectQueryParams`** — Validates via a `toHaveURL()` callback; on failure it throws an error listing mismatched params.
+7. **`within*` pushes, it does not replace** — Use `withinBack()` / `withinInitial()` to unwind the locator stack.
+8. **Coding conventions:** camelCase variables/functions, PascalCase classes, ES modules (`import`/`export`), ESLint flat config v10.
