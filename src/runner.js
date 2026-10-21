@@ -176,16 +176,22 @@ export class PageRunner {
    */
   _createMatcher(caller, action, initError) {
     return async (...args) => {
+      const { debug } = this._config;
       const counter = `          ${this.runCallerCounter++}`.slice(-10);
       // if (typeof global.expect !== 'undefined') {
       //   global.expect.getState().assertionCalls += 1;
       // }
+      const linkToCaller = debug ? initError.stack?.split('\n')?.[1] : '';
       try {
         this.log(`Action ${counter}:`, caller.name);
+        if (debug) {
+          // eslint-disable-next-line no-console
+          console.log(linkToCaller);
+        }
         return await action(...args);
       } catch (error) {
-        this.log(`Action ${counter} [`, caller.name, '] failed');
-        if (this._config.debug) {
+        this.log(`Action ${counter} [`, caller.name, '] failed', linkToCaller);
+        if (debug) {
           console.error(error);
         }
         error.stack = initError.stack;
@@ -340,7 +346,7 @@ export class PageRunner {
    * returns it as-is instead of calling `.first()`.
    *
    * @param {LocatorOrString} [locatorOrSelector] - Optional selector or Locator.
-   * @returns {import("playwright").Locator|import("playwright").Page} The first matching locator, or the page.
+   * @returns {import("playwright").Locator} The first matching locator, or the page.
    */
   findFirst(locatorOrSelector = undefined) {
     const result = this.find(locatorOrSelector);
