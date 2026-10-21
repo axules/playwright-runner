@@ -156,9 +156,14 @@ export class PageRunner {
 
   /**
    * Creates a shallow clone of this runner instance.
-   * Shares the same locator stack but creates a fresh action queue.
    *
-   * @returns {new this.constructor} A new runner instance with the same locator stack.
+   * The real implementation is assigned to the instance in the constructor
+   * (this stub only declares the API shape). The clone is built with the same
+   * constructor, initial locator and options, then given a reference to the
+   * same `_locatorsWay` array (shared locator stack, not a copy) and a fresh
+   * `actionsPull` queue.
+   *
+   * @returns {this.constructor} A new runner instance sharing the locator stack.
    */
   clone() {}
 
@@ -291,7 +296,9 @@ export class PageRunner {
 
   /**
    * Resolves a CSS selector string using the `:@method(arg)` syntax
-   * against the current page.
+   * against the current page (via `resolveCssLocator`).
+   *
+   * The `|>` shorthand syntax is not supported here.
    *
    * @param {LocatorOrString} locator - CSS selector with optional `:@method(arg)` directives.
    * @returns {import("playwright").Locator}
@@ -312,6 +319,7 @@ export class PageRunner {
    * Accepts all selector formats supported by {@link resolveCssLocator}:
    * plain CSS strings (with optional `:@method(arg)` directives), arrays of
    * mixed strings and custom method descriptors, or raw Playwright Locators.
+   * The `|>` shorthand syntax is not supported.
    *
    * @param {LocatorOrString|Array<string|{method: string, arg: string, node: string|null}>} [locatorOrSelector] -
    *   Optional selector or Locator. Supports `:@method(arg)` syntax.
@@ -342,8 +350,8 @@ export class PageRunner {
 
   /**
    * Resolves a selector and returns the first matching element.
-   * If the resolved locator is a Page or the selector is `'body'`,
-   * returns it as-is instead of calling `.first()`.
+   * Returns the resolved value as-is (instead of calling `.first()`) when it is
+   * a Page, when the selector is `'body'`, or when it has no `.first` method.
    *
    * @param {LocatorOrString} [locatorOrSelector] - Optional selector or Locator.
    * @returns {import("playwright").Locator} The first matching locator, or the page.
@@ -467,7 +475,9 @@ export class PageRunner {
 
   /**
    * Waits for the given function to return a truthy value.
-   * Delegates to Playwright's `page.waitForFunction`.
+   *
+   * NOTE: the implementation currently calls itself recursively instead of
+   * Playwright's `page.waitForFunction`, so it does not work as documented.
    *
    * @param {Function|string} callback - Function or string expression to evaluate.
    * @returns {this} runner instance for further chaining.
@@ -535,10 +545,10 @@ export class PageRunner {
   }
 
   /**
-   * Pushes a new locator resolved as a child of the current locator.
-   * Supports shorthand `|>` selector syntax via `find()`.
+   * Pushes a new locator resolved as a child of the current locator
+   * using `find()` (CSS / `:@method(arg)` syntax only; no `|>` shorthand).
    *
-   * @param {LocatorOrString} selector - Child selector (supports shorthand syntax).
+   * @param {LocatorOrString} selector - Child selector.
    * @returns {this} runner instance for further chaining.
    */
   withinChild(selector) {
@@ -622,7 +632,7 @@ export class PageRunner {
   /**
    * Asserts that an element is enabled.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
    * @returns {this} runner instance for further chaining.
    */
   expectEnabled(selector = undefined) {
@@ -658,7 +668,7 @@ export class PageRunner {
   /**
    * Asserts that an element is hidden. Alias for `dontSeeElement`.
    *
-   * @param {string} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
    * @returns {this} runner instance for further chaining.
    */
   expectHidden(selector = undefined) {
@@ -945,9 +955,11 @@ export class PageRunner {
 
   /**
    * Asserts that the current page URL matches the given URL or pattern.
-   * Supports wildcard prefixes: `* /` matches same-origin paths, `** /` matches any URL ending with the path.
+   * Supports wildcard prefixes: strings starting with a star slash match the
+   * current origin plus the rest of the string; strings starting with a double
+   * star slash match any URL ending with (and containing) the rest.
    *
-   * @param {string|RegExp} urlOrPath - URL string, RegExp, or wildcard pattern (`* /path` or `** /path`).
+   * @param {string|RegExp} urlOrPath - URL string, RegExp, or wildcard pattern.
    * @returns {this} runner instance for further chaining.
    */
   expectUrl(urlOrPath) {
@@ -964,6 +976,10 @@ export class PageRunner {
 
   /**
    * Asserts that the current page URL contains the expected query parameters.
+   *
+   * NOTE: the implementation reads each key with `params[key]` on a
+   * `URLSearchParams` object, which always yields `undefined`, so the assertion
+   * fails for any non-empty `expectedParams`. Use `params.get(key)` instead.
    *
    * @param {Object} expectedParams - Map of query parameter names to expected values.
    * @returns {this} runner instance for further chaining.
@@ -1055,7 +1071,8 @@ export class PageRunner {
    * Selects option values in a `<select>` element.
    *
    * @param {LocatorOrString} selector - CSS selector for the `<select>` element.
-   * @param {string|string[]|Object} values - Value(s) to select.
+   * @param {string|string[]|Object|Array<{value?: string, label?: string, index?: number}>} values -
+   *   Value(s) to select; passed to Playwright's `selectOption`.
    * @returns {this} runner instance for further chaining.
    */
   select(selector, values) {
@@ -1185,9 +1202,10 @@ export class PageRunner {
   /**
    * Takes a screenshot of the specified element and saves it.
    *
-   * @param {LocatorOrString} selector - CSS selector for the element to screenshot (required).
+   * @param {LocatorOrString} selector - CSS selector for the element (required).
    * @param {string} name - Screenshot name / filename.
    * @returns {this} runner instance for further chaining.
+   * @throws {MatcherError} If the selector is omitted.
    */
   saveShot(selector, name) {
     return this._pushAction(this.saveShot, async () => {
@@ -1280,9 +1298,13 @@ export class PageRunner {
    * Finds a network request by URL pattern and passes it to a matcher function.
    * Must be called between `listenNetwork()` and `stopListenNetwork()`.
    *
+   * NOTE: the implementation reads `page.requests`, which `PageNetworkListener`
+   * does not define (it stores records on the listener itself), and the
+   * `timeout` value is only used in the error message — no wait is performed.
+   *
    * @param {string|RegExp} url - URL or pattern to match.
    * @param {function(Request): Promise<void>|void} matcher - Async function that receives the matched Playwright Request object.
-   * @param {number} [timeout=2000] - Timeout in milliseconds to wait for the request.
+   * @param {number} [timeout=2000] - Only used to format the failure message (in milliseconds).
    * @returns {this} runner instance for further chaining.
    */
   matchRequest(url, matcher, timeout = 2000) {
@@ -1302,10 +1324,14 @@ export class PageRunner {
    * Finds a network response by URL pattern and passes it to a matcher function.
    * Must be called between `listenNetwork()` and `stopListenNetwork()`.
    *
+   * NOTE: the implementation reads `page.requests`, which `PageNetworkListener`
+   * does not define (it stores records on the listener itself), and the
+   * `timeout` value is only used in the error message — no wait is performed.
+   *
    * @param {string|RegExp} url - URL or pattern to match.
    * @param {function(Response): Promise<void>|void} matcher -
    *   Async function that receives the matched Playwright Response object.
-   * @param {number} [timeout=10000] - Timeout in milliseconds to wait for the response.
+   * @param {number} [timeout=10000] - Only used to format the failure message (in milliseconds).
    * @returns {this} runner instance for further chaining.
    */
   matchResponse(url, matcher, timeout = 10000) {
@@ -1352,6 +1378,9 @@ export class PageRunner {
   /**
    * Makes an HTTP fetch request relative to the current page's origin.
    *
+   * Unlike most methods this is NOT queued: it executes immediately and must be
+   * awaited directly (`await runner.fetch('/api')`).
+   *
    * @param {string} url - URL (absolute, root-relative, or relative).
    * @param {Object} [options={}] - Fetch options.
    * @returns {Promise<import("playwright").APIResponse>}
@@ -1366,17 +1395,31 @@ export class PageRunner {
    * Fetches a URL and asserts the response status and/or body.
    *
    * @param {string} url - URL to fetch (absolute or relative).
-   * @param {Object} options - Fetch options.
-   * @param {{ status?: number, data?: string|Object }} expected -
-   *   Expected response: `{ status: 200, data: '...' }` or `{ status: 200, data: { ... } }`.
+   * @param {Object} [options={}] - Fetch options (passed to `fetch`).
+   * @param {number|function(import("playwright").APIResponse): (void|Promise<void>)|{ status?: number, data?: string|Object, containsData?: Object|Array, check?: function(import("playwright").APIResponse): (void|Promise<void>) }} expected -
+   *   Expected outcome. When `expected` is a function, it receives the raw
+   *   `APIResponse`. When a number, asserts that status code. When an object,
+   *   supports these fields:
+   *   - `status` — asserts the HTTP status code.
+   *   - `data` — exact match: string compared with `toBe`, otherwise `toEqual`.
+   *   - `containsData` — partial/subset match: arrays use `arrayContaining`,
+   *     objects use `toMatchObject`.
+   *   - `check` — custom assertion callback receiving the raw `APIResponse`.
    * @returns {this} runner instance for further chaining.
+   * @throws {Error} If `expected` is falsy.
    */
   expectFetch(url, options, expected) {
     return this._pushAction(this.expectFetch, async () => {
+      if (!expected) {
+        throw new Error('expected is required');
+      }
+
       const result = await this.fetch(url, options);
-      if (expected.status) {
+
+      if (Number.isInteger(expected) || expected.status) {
         expect(result.status()).toBe(expected.status || expected);
       }
+
       if (expected.data) {
         if (isString(expected.data)) {
           const data = await result.text();
@@ -1385,6 +1428,23 @@ export class PageRunner {
           const data = await result.json();
           expect(data).toEqual(expected.data);
         }
+      }
+
+      if (expected.containsData) {
+        const data = await result.json();
+        if (Array.isArray(expected.containsData)) {
+          expect(data).toEqual(expect.arrayContaining(expected.containsData));
+        } else {
+          expect(data).toMatchObject(expected.containsData);
+        }
+      }
+
+      if (typeof expected === 'function' || expected.then) {
+        await expected(result);
+      }
+
+      if (expected.check) {
+        await expected.check(result);
       }
     });
   }
