@@ -188,7 +188,7 @@ export class PageRunner {
       // }
       const linkToCaller = debug ? initError.stack?.split('\n')?.[1] : '';
       try {
-        this.log(`Action ${counter}:`, caller.name);
+        this.log(`Action ${counter}:`, caller.name, 'in', this.currentLocator);
         if (debug) {
           // eslint-disable-next-line no-console
           console.log(linkToCaller);
