@@ -154,6 +154,8 @@ These methods **push** onto an internal locator stack; they never replace it. Us
 | `expectExactText(text, selector?)`       | Locator has exactly this text                   | `toHaveText()`                |
 | `expectEnabled(selector?)`               | Element is enabled                              | `toBeEnabled()`               |
 | `expectDisabled(selector?)`              | Element is disabled                             | `toBeDisabled()`              |
+| `expectChecked(selector?)`               | Checkbox/radio is checked                       | `toBeChecked()`               |
+| `expectNotChecked(selector?)`            | Checkbox/radio is not checked                   | `not.toBeChecked()`           |
 | `expectValue(selector, value)`           | Input has the given value                       | `toHaveValue()`               |
 | `expectStyles(styles, selector?)`        | Check CSS styles (`{ display: 'flex' }`)        | `toHaveCSS()` per entry       |
 | `expectAttributes(attr, selector?)`      | Check attributes (`{ href: '/path' }`)          | `toHaveAttribute()` per entry |

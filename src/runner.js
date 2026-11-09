@@ -642,6 +642,30 @@ export class PageRunner {
   }
 
   /**
+   * Asserts that a checkbox or radio element is checked.
+   *
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
+   */
+  expectChecked(selector = undefined) {
+    return this._pushAction(this.expectChecked, async () => {
+      await expect(this.find(selector)).toBeChecked();
+    });
+  }
+
+  /**
+   * Asserts that a checkbox or radio element is not checked.
+   *
+   * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
+   * @returns {this} runner instance for further chaining.
+   */
+  expectNotChecked(selector = undefined) {
+    return this._pushAction(this.expectNotChecked, async () => {
+      await expect(this.find(selector)).not.toBeChecked();
+    });
+  }
+
+  /**
    * Asserts that an element is disabled.
    *
    * @param {LocatorOrString} [selector] - Optional CSS selector. Uses current locator if omitted.
