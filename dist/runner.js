@@ -1434,6 +1434,11 @@ class PageRunner {
     }
     return newTab;
   }
+  focusTab() {
+    return this._pushAction(this.focusTab, async () => {
+      await this.currentPage.bringToFront();
+    });
+  }
 
   /**
    * @typedef {Object} ExpectedFetch

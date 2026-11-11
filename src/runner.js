@@ -1436,6 +1436,12 @@ export class PageRunner {
     return newTab;
   }
 
+  focusTab() {
+    return this._pushAction(this.focusTab, async () => {
+      await this.currentPage.bringToFront();
+    });
+  }
+
   /**
    * @typedef {Object} ExpectedFetch
    * @property {number} [status] - Asserts the HTTP status code.

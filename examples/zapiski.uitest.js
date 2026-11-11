@@ -29,5 +29,6 @@ test('Check login and registration forms', async ({ page }) => {
     .act(async ({ page }) => {
       await page.setViewportSize({ width: 640, height: 640 });
     })
+    .focusTab()
     .dontExpectText('12345');
 });
