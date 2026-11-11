@@ -16,8 +16,12 @@ test('Check login and registration forms', async ({ page }) => {
     .expectText('Войти')
     .clickContent('Войти')
     .act(async ({ runner }) => {
-      await runner.click('li:@text(Регистрация)');
-      await runner.expectText('Повторите пароль');
+      // runner is clone of this with empty call stack.
+      // this.click(...) is wrong way, because this.click will be pushed into call stack and will wait when act finished
+      // but act will be finished only when this.click finished - stuck.
+      // So you need to use runner.click(...) OR this.clone().click(...)
+      await runner.click('li:@text(Регистрация)')
+        .expectText('Повторите пароль');
     })
     .sayWhere()
     .sayFullPath()

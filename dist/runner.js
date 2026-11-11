@@ -90,6 +90,15 @@ class PageRunner {
   static new(initialLocator, options) {
     return new this(initialLocator, options);
   }
+  _withRunnerClone(params) {
+    const self = this;
+    return {
+      get runner() {
+        return self.clone();
+      },
+      ...params
+    };
+  }
 
   /**
    * Constructs a PageRunner instance.
@@ -120,15 +129,11 @@ class PageRunner {
       this.runCallerCounter = 0;
       this._locatorsWay = [locator];
       this.actionsPull = [];
+      this.jestExpect = _test.expect;
       if (debug) {
         // eslint-disable-next-line no-console
         this.log = (...args) => console.log(new Date().toISOString().replace('T', ' ').slice(10, 23), ...args);
       }
-    };
-    this.clone = () => {
-      const cloned = new this.constructor(this.initialLocator, options);
-      cloned._locatorsWay = this._locatorsWay;
-      return cloned;
     };
     this.init();
     this.log('New runner created', locator, options);
@@ -145,7 +150,11 @@ class PageRunner {
    *
    * @returns {this.constructor} A new runner instance sharing the locator stack.
    */
-  clone() {}
+  clone() {
+    const cloned = new this.constructor(this.initialLocator, this._config);
+    cloned._locatorsWay = this._locatorsWay;
+    return cloned;
+  }
 
   /**
    * Wraps an action function with error enrichment and debug logging.
@@ -211,15 +220,13 @@ class PageRunner {
     const nextMatcher = this._createMatcher(caller, nextAction, initError);
     if (this.actionsPull.length > 0) {
       const last = this.actionsPull[this.actionsPull.length - 1];
-      this.actionsPull.push(last.then(payload => nextMatcher({
-        payload,
-        runner: this
-      })));
+      this.actionsPull.push(last.then(payload => nextMatcher(this._withRunnerClone({
+        payload
+      }))));
     } else {
-      this.actionsPull.push(Promise.resolve(nextMatcher({
-        payload: undefined,
-        runner: this
-      })));
+      this.actionsPull.push(Promise.resolve(nextMatcher(this._withRunnerClone({
+        payload: undefined
+      }))));
     }
     return this;
   }
@@ -375,7 +382,7 @@ class PageRunner {
   /**
    * Executes an arbitrary user function as a step in the chain.
    *
-   * @param {function({runner: this, page: import('playwright').Page, expect: import('@playwright/test').Expect}): (any)} func -
+   * @param {function({runner: new this, page: import('playwright').Page, expect: import('@playwright/test').Expect}): (any)} func -
    *   Async or sync function receiving an object with `runner` and `page`.
    * @returns {this} runner instance for further chaining.
    * @example
@@ -387,11 +394,10 @@ class PageRunner {
    */
   act(func) {
     return this._pushAction(this.act, async () => {
-      await func({
-        runner: this.clone(),
+      await func(this._withRunnerClone({
         page: this.currentPage,
         expect: _test.expect
-      });
+      }));
     });
   }
 
@@ -432,12 +438,11 @@ class PageRunner {
     return this._pushAction(this.waitForRequestAfterTrigger, async () => {
       // https://playwright.dev/docs/api/class-page#page-wait-for-request
       const requestToWait = this.currentPage.waitForRequest(checkRequest);
-      await triggerFn({
-        runner: this.clone(),
+      await triggerFn(this._withRunnerClone({
         page: this.currentPage,
         waiter: requestToWait,
         expect: _test.expect
-      });
+      }));
       await requestToWait;
     });
   }
@@ -454,12 +459,11 @@ class PageRunner {
     return this._pushAction(this.waitForResponseAfterTrigger, async () => {
       // https://playwright.dev/docs/api/class-page#page-wait-for-response
       const responseToWait = this.currentPage.waitForResponse(checkResponse);
-      await triggerFn({
-        runner: this.clone(),
+      await triggerFn(this._withRunnerClone({
         page: this.currentPage,
         waiter: responseToWait,
         expect: _test.expect
-      });
+      }));
       await responseToWait;
     });
   }
@@ -1424,14 +1428,22 @@ class PageRunner {
   }
 
   /**
+   * @typedef {Object} ExpectedFetch
+   * @property {number} [status] - Asserts the HTTP status code.
+   * @property {string|Object} [data] - Exact match: string compared with `toBe`, otherwise `toEqual`.
+   * @property {Object|Array} [containsData] - Partial match: arrays use `arrayContaining`, objects use `toMatchObject`.
+   * @property {function(import('playwright').APIResponse)} [check] - Custom assertion callback.
+   */
+
+  /**
    * Fetches a URL and asserts the response status and/or body.
    *
    * @param {string} url - URL to fetch (absolute or relative).
-   * @param {Object} [options={}] - Fetch options (passed to `fetch`).
-   * @param {number|function(import("playwright").APIResponse): (void|Promise<void>)|{ status?: number, data?: string|Object, containsData?: Object|Array, check?: function(import("playwright").APIResponse): (void|Promise<void>) }} expected -
-   *   Expected outcome. When `expected` is a function, it receives the raw
-   *   `APIResponse`. When a number, asserts that status code. When an object,
-   *   supports these fields:
+   * @param {Object} options - Fetch options (passed to `fetch`).
+   * @param {number|function(import("playwright").APIResponse)|ExpectedFetch} expected - Expected outcome.
+   * - When `expected` is a function, it receives the raw `APIResponse`.
+   * - When a number, asserts that status code.
+   * - When an object, supports these fields:
    *   - `status` — asserts the HTTP status code.
    *   - `data` — exact match: string compared with `toBe`, otherwise `toEqual`.
    *   - `containsData` — partial/subset match: arrays use `arrayContaining`,
