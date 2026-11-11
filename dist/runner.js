@@ -1426,6 +1426,14 @@ class PageRunner {
     this.log('fetch', fullUrl);
     return this.apiContext.fetch(fullUrl, options);
   }
+  async newTab(url) {
+    const newTab = await this.currentPage.context().newPage();
+    await newTab.bringToFront();
+    if (url) {
+      await newTab.goto(this._enhanceUrl(url));
+    }
+    return newTab;
+  }
 
   /**
    * @typedef {Object} ExpectedFetch
