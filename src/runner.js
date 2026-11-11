@@ -1436,6 +1436,16 @@ export class PageRunner {
     return newTab;
   }
 
+  getTab(n) {
+    const pages = this.currentPage.context().pages();
+
+    if (n >= pages.length) {
+      throw new Error(`Page doesn't exist: ${n} >= ${pages.length}`);
+    }
+
+    return pages[n];
+  }
+
   focusTab() {
     return this._pushAction(this.focusTab, async () => {
       await this.currentPage.bringToFront();
